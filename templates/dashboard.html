@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Team Collaboration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1><i class="bi bi-house"></i> Team Dashboard</h1>
+        <p class="text-muted">Welcome back, {{ current_user.username }}!</p>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-secondary">Total Tasks</h5>
+                <h2 class="text-primary">{{ total_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-secondary">To Do</h5>
+                <h2 class="text-warning">{{ todo_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-secondary">In Progress</h5>
+                <h2 class="text-info">{{ in_progress_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center">
+            <div class="card-body">
+                <h5 class="card-title text-secondary">Completed</h5>
+                <h2 class="text-success">{{ done_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Recent Messages -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-chat-dots"></i> Recent Messages</h5>
+                <a href="{{ url_for('chat') }}" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body">
+                {% if recent_messages %}
+                    {% for message in recent_messages %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="d-flex justify-content-between">
+                            <strong>{{ message.author.username }}</strong>
+                            <small class="text-muted">{{ message.timestamp.strftime('%m/%d %H:%M') }}</small>
+                        </div>
+                        <p class="mb-0">{{ message.content[:100] }}{% if message.content|length > 100 %}...{% endif %}</p>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center">No messages yet. Start the conversation!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Tasks -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-kanban"></i> Recent Tasks</h5>
+                <a href="{{ url_for('kanban') }}" class="btn btn-sm btn-outline-primary">View Board</a>
+            </div>
+            <div class="card-body">
+                {% if recent_tasks %}
+                    {% for task in recent_tasks %}
+                    <div class="border-bottom pb-2 mb-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>{{ task.title }}</strong>
+                                <br>
+                                <small class="text-muted">by {{ task.creator.username }}</small>
+                            </div>
+                            <div class="text-end">
+                                {% if task.status == 'todo' %}
+                                    <span class="badge bg-warning">To Do</span>
+                                {% elif task.status == 'in_progress' %}
+                                    <span class="badge bg-info">In Progress</span>
+                                {% else %}
+                                    <span class="badge bg-success">Done</span>
+                                {% endif %}
+                                <br>
+                                <small class="text-muted">{{ task.updated_at.strftime('%m/%d') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center">No tasks yet. Create your first task!</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-lightning"></i> Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 text-center mb-3">
+                        <a href="{{ url_for('chat') }}" class="btn btn-outline-primary btn-lg w-100">
+                            <i class="bi bi-chat-dots"></i><br>
+                            Join Team Chat
+                        </a>
+                    </div>
+                    <div class="col-md-4 text-center mb-3">
+                        <a href="{{ url_for('kanban') }}" class="btn btn-outline-success btn-lg w-100">
+                            <i class="bi bi-plus-circle"></i><br>
+                            Create New Task
+                        </a>
+                    </div>
+                    <div class="col-md-4 text-center mb-3">
+                        <a href="{{ url_for('kanban') }}" class="btn btn-outline-info btn-lg w-100">
+                            <i class="bi bi-kanban"></i><br>
+                            View Kanban Board
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

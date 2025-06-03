@@ -1,0 +1,133 @@
+/* Custom styles for Team Collaboration app */
+
+/* Kanban board specific styles */
+.kanban-column {
+    min-height: 400px;
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.task-card {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.task-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Chat messages */
+.message-item {
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+    position: relative;
+}
+
+.message-item.selected {
+    background-color: var(--bs-gray-80);
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin: 0 -0.75rem;
+}
+
+.message-actions {
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    display: none;
+    background: white;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.25rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    z-index: 1000;
+}
+
+.message-item.selected .message-actions {
+    display: block;
+}
+
+/* Messages container scrolling */
+#messages-container {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* Dashboard cards */
+.card {
+    transition: transform 0.2s ease-in-out;
+}
+
+.card:hover {
+    transform: translateY(-1px);
+}
+
+/* Priority badges */
+.badge {
+    font-size: 0.75em;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .kanban-column {
+        min-height: 300px;
+        max-height: 400px;
+    }
+    
+    .task-card {
+        margin-bottom: 1rem;
+    }
+    
+    .navbar-brand {
+        font-size: 1rem;
+    }
+}
+
+/* Loading states */
+.btn:disabled {
+    opacity: 0.6;
+}
+
+/* Form improvements */
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--bs-primary);
+    box-shadow: 0 0 0 0.2rem rgba(var(--bs-primary-rgb), 0.25);
+}
+
+/* Table improvements */
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+/* Less aggressive highlight for system messages */
+.alert {
+    border: none;
+    border-radius: 0.5rem;
+    background-color: rgba(255, 255, 255, 0.9); /* Soft white background */
+    color: #333; /* Dark gray text for better readability */
+}
+
+/* Custom scrollbars for webkit browsers */
+.kanban-column::-webkit-scrollbar,
+#messages-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.kanban-column::-webkit-scrollbar-track,
+#messages-container::-webkit-scrollbar-track {
+    background: var(--bs-gray-200);
+    border-radius: 3px;
+}
+
+.kanban-column::-webkit-scrollbar-thumb,
+#messages-container::-webkit-scrollbar-thumb {
+    background: var(--bs-gray-400);
+    border-radius: 3px;
+}
+
+.kanban-column::-webkit-scrollbar-thumb:hover,
+#messages-container::-webkit-scrollbar-thumb:hover {
+    background: var(--bs-gray-500);
+}

@@ -1,0 +1,474 @@
+{% extends "base.html" %}
+
+{% block title %}Kanban Board - Team Collaboration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1><i class="bi bi-kanban"></i> Kanban Board</h1>
+        <p class="text-muted">Track and manage your team's tasks</p>
+    </div>
+</div>
+
+<!-- Project Templates -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-file-earmark-code"></i> Project Templates</h5>
+            </div>
+            <div class="card-body">
+                {% if templates %}
+                <div class="d-flex flex-wrap gap-2">
+                    {% for template in templates %}
+                    <button class="btn btn-outline-primary btn-sm" onclick="applyTemplate({{ template.id }})">
+                        <i class="bi bi-lightning"></i> {{ template.name }}
+                    </button>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted mb-0">No project templates available. Create one in the admin panel.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Task Form -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-plus-circle"></i> Create New Task</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="title" class="form-label">Task Title *</label>
+                                <input type="text" class="form-control" id="title" name="title" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="priority" class="form-label">Priority</label>
+                                <select class="form-select" id="priority" name="priority">
+                                    <option value="low">Low</option>
+                                    <option value="medium" selected>Medium</option>
+                                    <option value="high">High</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="assigned_to" class="form-label">Assign To</label>
+                                <select class="form-select" id="assigned_to" name="assigned_to">
+                                    <option value="">Unassigned</option>
+                                    {% for user in users %}
+                                    <option value="{{ user.id }}">{{ user.username }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="due_date" class="form-label">Due Date</label>
+                                <input type="date" class="form-control" id="due_date" name="due_date">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-plus"></i> Create Task
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Kanban Board -->
+<div class="row">
+    <!-- To Do Column -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="bi bi-circle"></i> To Do ({{ todo_tasks|length }})</h5>
+            </div>
+            <div class="card-body kanban-column">
+                {% for task in todo_tasks %}
+                <div class="card mb-3 task-card" data-task-id="{{ task.id }}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-1">{{ task.title }}</h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick="openTaskModal({{ task.id }})">
+                                        <i class="bi bi-eye"></i> View Details
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='in_progress') }}">
+                                        <i class="bi bi-arrow-right"></i> Move to In Progress
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='done') }}">
+                                        <i class="bi bi-check"></i> Mark as Done
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="{{ url_for('delete_task', task_id=task.id) }}" onclick="return confirm('Are you sure?')">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        {% if task.description %}
+                        <p class="card-text text-muted small">{{ task.description }}</p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-{{ 'danger' if task.priority == 'high' else 'warning' if task.priority == 'medium' else 'secondary' }}">
+                                {{ task.priority.title() }}
+                            </span>
+                            <small class="text-muted">{{ task.creator.username }}</small>
+                        </div>
+                        {% if task.assignee %}
+                        <div class="mb-2">
+                            <small class="text-info">
+                                <i class="bi bi-person-fill"></i> Assigned to: {{ task.assignee.username }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        {% if task.due_date %}
+                        <div class="mb-2">
+                            <small class="text-{{ 'danger' if task.due_date < now else 'warning' if (task.due_date - now).days <= 3 else 'muted' }}">
+                                <i class="bi bi-calendar"></i> Due: {{ task.due_date.strftime('%m/%d/%Y') }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        <small class="text-muted d-block">Created: {{ task.created_at.strftime('%m/%d/%Y') }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if not todo_tasks %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-circle fs-1"></i>
+                    <p>No tasks in To Do</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- In Progress Column -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info">
+                <h5 class="mb-0"><i class="bi bi-arrow-clockwise"></i> In Progress ({{ in_progress_tasks|length }})</h5>
+            </div>
+            <div class="card-body kanban-column">
+                {% for task in in_progress_tasks %}
+                <div class="card mb-3 task-card" data-task-id="{{ task.id }}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-1">{{ task.title }}</h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick="openTaskModal({{ task.id }})">
+                                        <i class="bi bi-eye"></i> View Details
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='todo') }}">
+                                        <i class="bi bi-arrow-left"></i> Move to To Do
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='done') }}">
+                                        <i class="bi bi-check"></i> Mark as Done
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="{{ url_for('delete_task', task_id=task.id) }}" onclick="return confirm('Are you sure?')">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        {% if task.description %}
+                        <p class="card-text text-muted small">{{ task.description }}</p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-{{ 'danger' if task.priority == 'high' else 'warning' if task.priority == 'medium' else 'secondary' }}">
+                                {{ task.priority.title() }}
+                            </span>
+                            <small class="text-muted">{{ task.creator.username }}</small>
+                        </div>
+                        {% if task.assignee %}
+                        <div class="mb-2">
+                            <small class="text-info">
+                                <i class="bi bi-person-fill"></i> Assigned to: {{ task.assignee.username }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        {% if task.due_date %}
+                        <div class="mb-2">
+                            <small class="text-{{ 'danger' if task.due_date < now else 'warning' if (task.due_date - now).days <= 3 else 'muted' }}">
+                                <i class="bi bi-calendar"></i> Due: {{ task.due_date.strftime('%m/%d/%Y') }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        <small class="text-muted d-block">Created: {{ task.created_at.strftime('%m/%d/%Y') }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if not in_progress_tasks %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-arrow-clockwise fs-1"></i>
+                    <p>No tasks in progress</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Done Column -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-success">
+                <h5 class="mb-0"><i class="bi bi-check-circle"></i> Done ({{ done_tasks|length }})</h5>
+            </div>
+            <div class="card-body kanban-column">
+                {% for task in done_tasks %}
+                <div class="card mb-3 task-card" data-task-id="{{ task.id }}">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h6 class="card-title mb-1">{{ task.title }}</h6>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                    <i class="bi bi-three-dots"></i>
+                                </button>
+                                <ul class="dropdown-menu">
+                                    <li><a class="dropdown-item" href="#" onclick="openTaskModal({{ task.id }})">
+                                        <i class="bi bi-eye"></i> View Details
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='todo') }}">
+                                        <i class="bi bi-arrow-left"></i> Move to To Do
+                                    </a></li>
+                                    <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='in_progress') }}">
+                                        <i class="bi bi-arrow-left"></i> Move to In Progress
+                                    </a></li>
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li><a class="dropdown-item text-danger" href="{{ url_for('delete_task', task_id=task.id) }}" onclick="return confirm('Are you sure?')">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </a></li>
+                                </ul>
+                            </div>
+                        </div>
+                        {% if task.description %}
+                        <p class="card-text text-muted small">{{ task.description }}</p>
+                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge bg-{{ 'danger' if task.priority == 'high' else 'warning' if task.priority == 'medium' else 'secondary' }}">
+                                {{ task.priority.title() }}
+                            </span>
+                            <small class="text-muted">{{ task.creator.username }}</small>
+                        </div>
+                        {% if task.assignee %}
+                        <div class="mb-2">
+                            <small class="text-info">
+                                <i class="bi bi-person-fill"></i> Assigned to: {{ task.assignee.username }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        {% if task.due_date %}
+                        <div class="mb-2">
+                            <small class="text-{{ 'danger' if task.due_date < now else 'warning' if (task.due_date - now).days <= 3 else 'muted' }}">
+                                <i class="bi bi-calendar"></i> Due: {{ task.due_date.strftime('%m/%d/%Y') }}
+                            </small>
+                        </div>
+                        {% endif %}
+                        <small class="text-muted d-block">Created: {{ task.created_at.strftime('%m/%d/%Y') }}</small>
+                    </div>
+                </div>
+                {% endfor %}
+
+                {% if not done_tasks %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-check-circle fs-1"></i>
+                    <p>No completed tasks</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task Details Modal -->
+<div class="modal fade" id="taskModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="taskModalTitle">Task Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="taskModalBody">
+                <div class="d-flex justify-content-center">
+                    <div class="spinner-border" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openTaskModal(taskId) {
+    const modal = new bootstrap.Modal(document.getElementById('taskModal'));
+    document.getElementById('taskModalBody').innerHTML = `
+        <div class="d-flex justify-content-center">
+            <div class="spinner-border" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+        </div>
+    `;
+    modal.show();
+    
+    // Load task details
+    fetch(`/api/task/${taskId}`)
+        .then(response => response.json())
+        .then(task => {
+            document.getElementById('taskModalTitle').textContent = task.title;
+            document.getElementById('taskModalBody').innerHTML = `
+                <div class="mb-3">
+                    <h6>Description</h6>
+                    <p>${task.description || 'No description provided'}</p>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6>Priority</h6>
+                        <span class="badge bg-${task.priority === 'high' ? 'danger' : task.priority === 'medium' ? 'warning' : 'secondary'}">${task.priority}</span>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Status</h6>
+                        <span class="badge bg-info">${task.status.replace('_', ' ')}</span>
+                    </div>
+                </div>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <h6>Created by</h6>
+                        <p>${task.creator}</p>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Assigned to</h6>
+                        <p>${task.assignee || 'Unassigned'}</p>
+                    </div>
+                </div>
+                ${task.due_date ? `<div class="mb-3"><h6>Due Date</h6><p>${task.due_date}</p></div>` : ''}
+                <div class="mb-3">
+                    <h6>Comments</h6>
+                    <div id="comments-${taskId}">Loading comments...</div>
+                    <div class="mt-2">
+                        <textarea class="form-control mb-2" id="new-comment-${taskId}" placeholder="Add a comment..." rows="2"></textarea>
+                        <button class="btn btn-primary btn-sm" onclick="addComment(${taskId})">Add Comment</button>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <h6>Activity Log</h6>
+                    <div id="activity-${taskId}">Loading activity...</div>
+                </div>
+            `;
+            
+            // Load comments and activity
+            loadComments(taskId);
+            loadActivity(taskId);
+        })
+        .catch(error => {
+            document.getElementById('taskModalBody').innerHTML = '<p class="text-danger">Error loading task details</p>';
+        });
+}
+
+function loadComments(taskId) {
+    fetch(`/api/task/${taskId}/comments`)
+        .then(response => response.json())
+        .then(comments => {
+            const commentsDiv = document.getElementById(`comments-${taskId}`);
+            if (comments.length === 0) {
+                commentsDiv.innerHTML = '<p class="text-muted">No comments yet</p>';
+            } else {
+                commentsDiv.innerHTML = comments.map(comment => `
+                    <div class="border-bottom mb-2 pb-2">
+                        <strong>${comment.author}</strong> 
+                        <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
+                        <p class="mb-0">${comment.content}</p>
+                    </div>
+                `).join('');
+            }
+        });
+}
+
+function loadActivity(taskId) {
+    fetch(`/api/task/${taskId}/activity`)
+        .then(response => response.json())
+        .then(activities => {
+            const activityDiv = document.getElementById(`activity-${taskId}`);
+            if (activities.length === 0) {
+                activityDiv.innerHTML = '<p class="text-muted">No activity yet</p>';
+            } else {
+                activityDiv.innerHTML = activities.map(activity => `
+                    <div class="border-bottom mb-2 pb-2">
+                        <strong>${activity.user}</strong> ${activity.action.replace('_', ' ')}
+                        <small class="text-muted d-block">${new Date(activity.created_at).toLocaleString()}</small>
+                        ${activity.details ? `<small class="text-muted">${activity.details}</small>` : ''}
+                    </div>
+                `).join('');
+            }
+        });
+}
+
+function addComment(taskId) {
+    const textarea = document.getElementById(`new-comment-${taskId}`);
+    const content = textarea.value.trim();
+    
+    if (!content) return;
+    
+    fetch(`/api/task/${taskId}/comment`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ content: content })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            textarea.value = '';
+            loadComments(taskId);
+            loadActivity(taskId);
+        }
+    });
+}
+
+function applyTemplate(templateId) {
+    if (confirm('This will create multiple tasks from the template. Continue?')) {
+        fetch(`/api/template/${templateId}/apply`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                location.reload();
+            } else {
+                alert('Error applying template: ' + result.error);
+            }
+        });
+    }
+}
+</script>
+{% endblock %}

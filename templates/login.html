@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}Access Portal - Wispr{% endblock %}
+
+{% block content %}
+<div class="login-background">
+    <div class="row justify-content-center align-items-center min-vh-100">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow-lg border-0 bg-dark">
+                <div class="card-header text-center bg-transparent border-0 py-4">
+                    <div class="mb-3">
+                        <i class="bi bi-eye-slash-fill text-danger" style="font-size: 3rem;"></i>
+                    </div>
+                    <h2 class="text-light mb-0">Wispr</h2>
+                    <small class="text-muted">Secure Team Collaboration Platform</small>
+                </div>
+                <div class="card-body px-5 pb-5">
+                    <form method="POST">
+                        <div class="mb-4">
+                            <label for="username" class="form-label text-light">Access Code</label>
+                            <input type="text" class="form-control bg-dark border-secondary text-light" id="username" name="username" required placeholder="Enter your identity">
+                        </div>
+                        <div class="mb-4">
+                            <label for="password" class="form-label text-light">Passphrase</label>
+                            <input type="password" class="form-control bg-dark border-secondary text-light" id="password" name="password" required placeholder="••••••••">
+                        </div>
+                        <button type="submit" class="btn btn-danger w-100 py-2">
+                            <i class="bi bi-shield-check"></i> Authenticate
+                        </button>
+                    </form>
+                    
+                    
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.login-background {
+    background: linear-gradient(135deg, #0c0c0c 0%, #1a1a1a 50%, #0d1117 100%);
+    min-height: 100vh;
+    position: relative;
+}
+
+.login-background::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+        radial-gradient(circle at 20% 50%, rgba(220, 38, 127, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(120, 119, 198, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 40% 80%, rgba(255, 206, 84, 0.05) 0%, transparent 50%);
+    animation: pulse 4s ease-in-out infinite alternate;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+
+.card {
+    backdrop-filter: blur(10px);
+    background-color: rgba(13, 17, 23, 0.9) !important;
+}
+
+.form-control:focus {
+    background-color: #1a1a1a !important;
+    border-color: #dc2626 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 38, 38, 0.25) !important;
+    color: #fff !important;
+}
+
+.form-control::placeholder {
+    color: #6c757d !important;
+}
+
+code {
+    background-color: rgba(220, 38, 38, 0.1);
+    color: #dc2626;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Team Collaboration{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1><i class="bi bi-gear"></i> Admin Panel</h1>
+        <p class="text-muted">Manage team members and system settings</p>
+    </div>
+</div>
+
+<!-- Create User Form -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-person-plus"></i> Create New User</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('create_user') }}">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username *</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password *</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin">
+                                    <label class="form-check-label" for="is_admin">
+                                        Admin Privileges
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-person-plus"></i> Create User
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Users List -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-people"></i> Team Members ({{ users|length }})</h5>
+            </div>
+            <div class="card-body">
+                {% if users %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Username</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in users %}
+                            <tr>
+                                <td>
+                                    <strong>{{ user.username }}</strong>
+                                    {% if user.id == current_user.id %}
+                                        <span class="badge bg-info ms-1">You</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.email }}</td>
+                                <td>
+                                    {% if user.is_admin %}
+                                        <span class="badge bg-danger">Admin</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Member</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
+                                <td>
+                                    {% if user.id != current_user.id %}
+                                    <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" style="display: inline;">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"
+                                                onclick="return confirm('Are you sure you want to delete this user? This will also delete all their messages and tasks.');">
+                                            <i class="bi bi-trash"></i> Delete
+                                        </button>
+                                    </form>
+                                    {% else %}
+                                    <span class="text-muted">Cannot delete yourself</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-people fs-1"></i>
+                    <h4>No users found</h4>
+                    <p>Create the first user to get started!</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- System Information -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-info-circle"></i> System Information</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Database Statistics</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Total Users:</strong> {{ users|length }}</li>
+                            <li><strong>Admin Users:</strong> {{ users|selectattr('is_admin')|list|length }}</li>
+                            <li><strong>Regular Members:</strong> {{ users|rejectattr('is_admin')|list|length }}</li>
+                        </ul>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Security Information</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Session-based authentication:</strong> ✅ Active</li>
+                            <li><strong>Password hashing:</strong> ✅ Werkzeug PBKDF2</li>
+                            <li><strong>Admin-only access:</strong> ✅ Protected</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
