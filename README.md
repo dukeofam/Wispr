@@ -32,7 +32,7 @@ A simple, secure Flask-based team collaboration platform featuring chat function
 
 ---
 
-**At this moment, you have to clone the repo and:**
+# 🚨❗ **At this moment, you have to clone the repo and:** ❗🚨
 
 1) run the "fix_install.sh" script (runs the sed command to fix the install.sh file by removing Windows-style carriage returns (\r) from the end of each line)
 2) delete the database file in /instances (NOT THE WHOLE DIR!)
