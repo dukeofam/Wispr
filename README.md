@@ -2,7 +2,7 @@
 
 ### A simple, secure Flask-based team collaboration platform featuring chat functionality and kanban task management. Perfect for small teams who need a private workspace without external dependencies.
 
-#### I'm not much of a coder myself (I know "advanced basics") - though I'd love to, but I'm too old, busy and (honestly) lazy to learn, so I co-operate with AI instead... :) If you find any bugs, vulns or whatever else, feel free to let me know or fix it. PRs for fixes/feature upgrades are welcome! :)
+#### I'm not much of a coder myself (I know "advanced basics") though I'd love to. But I'm too old, busy and (honestly) lazy to learn, so I co-operate with AI instead... :) If you find any bugs, vulns or whatever else, feel free to let me know or fix it. PRs for fixes/feature upgrades are welcome! :)
 
 ## ✨ Features
 
