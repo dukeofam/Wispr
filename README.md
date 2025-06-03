@@ -1,6 +1,8 @@
 # 🎯 Wispr
 
-A simple, secure Flask-based team collaboration platform featuring chat functionality and kanban task management. Perfect for small teams who need a private workspace without external dependencies.
+### A simple, secure Flask-based team collaboration platform featuring chat functionality and kanban task management. Perfect for small teams who need a private workspace without external dependencies.
+
+#### I'm not much of a coder myself (I know "advanced basics") - though I'd love to, but I'm too old, busy and (honestly) lazy to learn, so I co-operate with AI instead... :) If you find any bugs, vulns or whatever else, feel free to let me know or fix it. PRs for fixes/feature upgrades are welcome! :)
 
 ## ✨ Features
 
@@ -28,27 +30,6 @@ A simple, secure Flask-based team collaboration platform featuring chat function
 - pip (Python package manager) 📦
 - Git (for cloning the repository) 🌿
 
-### ⚡ One-Command Setup
-
----
-
-# ❗ **At this moment, you have to clone the repo and:** ❗
-
-1) run the "fix_install.sh" script (runs the sed command to fix the install.sh file by removing Windows-style carriage returns (\r) from the end of each line)
-2) delete the database file in /instances (NOT THE WHOLE DIR!)
-3) ```chmod +x install.sh chmod +x run.sh```
-
-These minor issues/inconveniences will be fixed ASAP, however bigger updates (new features) have higher priority. :)
-
----
-
-For the fastest setup, copy and paste this into your terminal:
-
-```bash
-git clone https://github.com/dukeofam/Wispr.git && cd Wispr && chmod +x install.sh && ./install.sh && ./run.sh
-```
-
-This will clone the repository, install everything, and start Wispr automatically.
 
 ### 🤖 Automatic Installation (Recommended)
 
@@ -58,15 +39,28 @@ This will clone the repository, install everything, and start Wispr automaticall
    cd Wispr
    ```
 
-2. **🎬 Run the automated installer**
+2. **run the "fix_install.sh" script**
+   Fixes the install.sh file by removing Windows-style carriage returns (\r) from the end of each line
+   ```bash
+   chmod +x fix_install.sh && ./fix_install.sh
+   ```
+
+3. **🎬 Run the automated installer**
    ```bash
    chmod +x install.sh && ./install.sh
    ```
 
-3. **🎯 Start Wispr**
+4. **Delete the DB file in */instance* folder (NOT THE WHOLE DIR!)**
+   The DB file will be re-created automatically upon server start. Server will crash with the old DB file (leftover from testing, has incorrect tables and data)
+
+6. **🎯 Start Wispr**
    ```bash
-   ./run.sh
+   chmod +x run.sh && ./run.sh
    ```
+
+---
+These minor issues/inconveniences will be fixed ASAP (to make the clone-to-run phase fully automated), however bigger updates (new features) have higher priority. :)
+---
 
 The automated installer will:
 - 🔍 Detect your operating system
