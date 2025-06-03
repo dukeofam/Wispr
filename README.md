@@ -3,13 +3,6 @@
 ### A simple, secure Flask-based team collaboration platform featuring chat functionality and kanban task management. Perfect for small teams who need a private workspace without external dependencies.
 
 
-![login](https://github.com/user-attachments/assets/170834e1-d030-4c71-8c0f-dd4f81b05058)   ![dashboard](https://github.com/user-attachments/assets/502494a5-5d28-4f1b-8e98-ce69da7da876)   
-
-![chat](https://github.com/user-attachments/assets/600fa416-e6d6-42ae-b434-cba401555c0e)   ![kanban](https://github.com/user-attachments/assets/95698862-bbec-4a5f-b8d2-732e7b715741)
-
-![tasks](https://github.com/user-attachments/assets/ed1f9b81-78dc-4414-8966-f19c8bdaa9c4)
-
-
 #### I'm not much of a coder myself (I know "advanced basics") though I'd love to. But I'm too old, busy and (honestly) lazy to learn, so I co-operate with AI instead... :) If you find any bugs, vulns or whatever else, feel free to let me know or fix it. PRs for fixes/feature upgrades are welcome! :)
 
 ## ✨ Features
@@ -233,6 +226,7 @@ connection.close()
 1. **Login as Admin**
    - Use default credentials: `admin` / `admin123`
    - Change the default password immediately in production
+![login](https://github.com/user-attachments/assets/170834e1-d030-4c71-8c0f-dd4f81b05058)
 
 2. **Create Team Members**
    - Go to Admin Panel
@@ -264,11 +258,13 @@ connection.close()
 - Task statistics and recent activity
 - Quick access to all major features
 - Team collaboration overview
+![dashboard](https://github.com/user-attachments/assets/502494a5-5d28-4f1b-8e98-ce69da7da876)
 
 **Team Chat**
 - Send messages to the entire team
 - Real-time conversation (auto-refresh every 30 seconds)
 - Message history with timestamps
+![chat](https://github.com/user-attachments/assets/600fa416-e6d6-42ae-b434-cba401555c0e)
 
 **Kanban Board**
 - Create tasks with titles, descriptions, and priorities
@@ -276,6 +272,7 @@ connection.close()
 - Drag tasks between columns (via dropdown menus)
 - Priority levels: Low, Medium, High
 - Task ownership tracking
+![kanban](https://github.com/user-attachments/assets/95698862-bbec-4a5f-b8d2-732e7b715741)
 
 **Admin Panel**
 - Create new team members
