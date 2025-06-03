@@ -30,6 +30,18 @@ A simple, secure Flask-based team collaboration platform featuring chat function
 
 ### ⚡ One-Command Setup
 
+---
+
+**At this moment, you have to clone the repo and:**
+
+1) run the "fix_install.sh" script (runs the sed command to fix the install.sh file by removing Windows-style carriage returns (\r) from the end of each line)
+2) delete the database file in /instances (NOT THE WHOLE DIR!)
+3) ```chmod +x install.sh chmod +x run.sh```
+
+These minor issues/inconveniences will be fixed ASAP, however bigger updates (new features) have higher priority. :)
+
+---
+
 For the fastest setup, copy and paste this into your terminal:
 
 ```bash
