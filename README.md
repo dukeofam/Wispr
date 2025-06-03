@@ -2,6 +2,14 @@
 
 ### A simple, secure Flask-based team collaboration platform featuring chat functionality and kanban task management. Perfect for small teams who need a private workspace without external dependencies.
 
+
+![login](https://github.com/user-attachments/assets/170834e1-d030-4c71-8c0f-dd4f81b05058)   ![dashboard](https://github.com/user-attachments/assets/502494a5-5d28-4f1b-8e98-ce69da7da876)   
+
+![chat](https://github.com/user-attachments/assets/600fa416-e6d6-42ae-b434-cba401555c0e)   ![kanban](https://github.com/user-attachments/assets/95698862-bbec-4a5f-b8d2-732e7b715741)
+
+![tasks](https://github.com/user-attachments/assets/ed1f9b81-78dc-4414-8966-f19c8bdaa9c4)
+
+
 #### I'm not much of a coder myself (I know "advanced basics") though I'd love to. But I'm too old, busy and (honestly) lazy to learn, so I co-operate with AI instead... :) If you find any bugs, vulns or whatever else, feel free to let me know or fix it. PRs for fixes/feature upgrades are welcome! :)
 
 ## ✨ Features
