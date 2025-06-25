@@ -216,7 +216,6 @@ def get_direct_messages(user_id):
 @app.route('/api/create_room', methods=['POST'])
 @login_required
 def create_room():
-    """Create a new chat room"""
     name = request.form.get('name', '').strip()
     description = request.form.get('description', '').strip()
     is_private = request.form.get('is_private') == 'true'
@@ -227,19 +226,32 @@ def create_room():
     # Check if room already exists
     existing_room = ChatRoom.query.filter_by(name=name).first()
     if existing_room:
-        return jsonify({'success': False, 'error': 'Room name already exists'})
+        return jsonify({'success': False, 'error': 'A room with this name already exists'})
     
-    room = ChatRoom(
+    # Create new room
+    new_room = ChatRoom(
         name=name,
         description=description,
         is_private=is_private,
         created_by=session['user_id']
     )
     
-    db.session.add(room)
-    db.session.commit()
-    
-    return jsonify({'success': True, 'room_id': room.id})
+    try:
+        db.session.add(new_room)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True, 
+            'room': {
+                'id': new_room.id,
+                'name': new_room.name,
+                'description': new_room.description,
+                'is_private': new_room.is_private
+            }
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)})
 
 
 @app.route('/api/delete_room/<int:room_id>', methods=['DELETE'])
@@ -749,7 +761,9 @@ def inject_user():
 # WebSocket Events for Real-time Chat
 @socketio.on('connect')
 def on_connect():
+    print(f"Client connected, session: {session}")
     if 'user_id' not in session:
+        print("No user_id in session during connect")
         return False
 
     user = User.query.get(session['user_id'])
@@ -757,12 +771,16 @@ def on_connect():
         online_users.add(user.id)
         # Join user's personal room for direct messages
         join_room(f"user_{user.id}")
+        print(f"User {user.username} connected and joined room user_{user.id}")
         emit('user_connected', {
             'username': user.username,
             'message': f'{user.username} joined the chat'
         }, broadcast=True)
         # Broadcast updated online count
         emit('online_count_updated', {'count': len(online_users)}, broadcast=True)
+    else:
+        print("User not found during connect")
+        return False
 
 
 @socketio.on('disconnect')
@@ -793,9 +811,20 @@ def on_join_room(data):
         if general_room:
             room_name = f"room_{general_room.id}"
         else:
-            room_name = "room_general"
-    elif room_name.isdigit():
+            # Create general room if it doesn't exist
+            user = User.query.get(session['user_id'])
+            general_room = ChatRoom(
+                name='General Chat',
+                description='Default chat room for all team members',
+                created_by=user.id
+            )
+            db.session.add(general_room)
+            db.session.commit()
+            room_name = f"room_{general_room.id}"
+    elif room_name and room_name.isdigit():
         room_name = f"room_{room_name}"
+    else:
+        return
     
     join_room(room_name)
     user = User.query.get(session['user_id'])
@@ -821,9 +850,11 @@ def on_leave_room(data):
         if general_room:
             room_name = f"room_{general_room.id}"
         else:
-            room_name = "room_general"
+            return
     elif str(room_name).isdigit():
         room_name = f"room_{room_name}"
+    else:
+        return
     
     leave_room(room_name)
 
@@ -831,17 +862,22 @@ def on_leave_room(data):
 @socketio.on('send_message')
 def handle_message(data):
     if 'user_id' not in session:
+        print("No user_id in session")
         return
 
     content = data.get('message', '').strip()
     room_id = data.get('room')
     recipient_id = data.get('recipient_id')
     
+    print(f"Received message: content='{content}', room_id='{room_id}', recipient_id='{recipient_id}'")
+    
     if not content:
+        print("Empty content")
         return
 
     user = User.query.get(session['user_id'])
     if not user:
+        print("User not found")
         return
 
     # Handle direct messages
@@ -865,6 +901,7 @@ def handle_message(data):
             'attachments': []
         }
         
+        print(f"Emitting direct message to users {user.id} and {recipient_id}")
         emit('receive_message', message_data, room=f"user_{user.id}")
         emit('receive_message', message_data, room=f"user_{recipient_id}")
         return
@@ -874,6 +911,23 @@ def handle_message(data):
         general_room = ChatRoom.query.filter_by(name='General Chat').first()
         if general_room:
             room_id = general_room.id
+        else:
+            # Create general room if it doesn't exist
+            general_room = ChatRoom(
+                name='General Chat',
+                description='Default chat room for all team members',
+                created_by=user.id
+            )
+            db.session.add(general_room)
+            db.session.commit()
+            room_id = general_room.id
+    
+    # Convert room_id to int if it's a string
+    try:
+        room_id = int(room_id)
+    except (ValueError, TypeError):
+        print(f"Invalid room_id: {room_id}")
+        return
     
     message = ChatMessage(
         content=content, 
@@ -885,15 +939,18 @@ def handle_message(data):
     db.session.commit()
 
     # Broadcast message to room
-    room_name = f"room_{room_id}" if room_id != 'general' else "room_general"
-    emit('receive_message', {
+    room_name = f"room_{room_id}"
+    message_data = {
         'id': message.id,
         'content': message.content,
         'username': user.username,
         'is_admin': user.is_admin,
         'timestamp': message.timestamp.isoformat(),
         'attachments': []
-    }, room=room_name)
+    }
+    
+    print(f"Emitting room message to room {room_name}")
+    emit('receive_message', message_data, room=room_name)
 
 
 @socketio.on('start_typing')
@@ -909,9 +966,15 @@ def handle_start_typing(data):
         return
     
     if room_name == 'general':
-        room_name = "room_general"
+        general_room = ChatRoom.query.filter_by(name='General Chat').first()
+        if general_room:
+            room_name = f"room_{general_room.id}"
+        else:
+            return
     elif str(room_name).isdigit():
         room_name = f"room_{room_name}"
+    else:
+        return
     
     emit('user_typing', {
         'username': user.username
@@ -930,8 +993,14 @@ def handle_stop_typing(data):
         return
     
     if room_name == 'general':
-        room_name = "room_general"
+        general_room = ChatRoom.query.filter_by(name='General Chat').first()
+        if general_room:
+            room_name = f"room_{general_room.id}"
+        else:
+            return
     elif str(room_name).isdigit():
         room_name = f"room_{room_name}"
+    else:
+        return
     
     emit('user_stopped_typing', {}, room=room_name, include_self=False)

@@ -156,6 +156,7 @@ socket.on('connect', function() {
 
 // Handle receiving messages
 socket.on('receive_message', function(data) {
+    console.log('Received message:', data);
     addMessageToChat(data);
     document.getElementById('no-messages').style.display = 'none';
 });
@@ -198,6 +199,7 @@ document.getElementById('message-form').addEventListener('submit', function(e) {
             recipient_id: currentDMUser
         };
 
+        console.log('Sending message:', data);
         socket.emit('send_message', data);
         messageInput.value = '';
 
@@ -415,8 +417,41 @@ document.getElementById('create-room-form').addEventListener('submit', function(
     .then(response => response.json())
     .then(data => {
         if (data.success) {
-            location.reload();
+            // Add the new room to the UI dynamically
+            const roomsContainer = document.querySelector('.list-group');
+            const newRoomDiv = document.createElement('div');
+            newRoomDiv.className = 'list-group-item list-group-item-action d-flex justify-content-between align-items-center';
+            newRoomDiv.setAttribute('data-room', data.room.id);
+            
+            newRoomDiv.innerHTML = 
+                '<a href="#" class="flex-grow-1 text-decoration-none text-reset" onclick="switchRoom(\'' + data.room.id + '\', \'' + data.room.name + '\')">' +
+                '<i class="bi bi-hash"></i> ' + data.room.name +
+                '</a>' +
+                '<button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteRoom(' + data.room.id + ', \'' + data.room.name + '\')" title="Delete room">' +
+                '<i class="bi bi-trash"></i>' +
+                '</button>';
+            
+            // Insert after the first room (General Chat)
+            const firstRoom = roomsContainer.querySelector('.list-group-item');
+            roomsContainer.insertBefore(newRoomDiv, firstRoom.nextSibling);
+            
+            // Clear form and close modal
+            document.getElementById('room-name').value = '';
+            document.getElementById('room-description').value = '';
+            document.getElementById('room-private').checked = false;
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createRoomModal'));
+            modal.hide();
+            
+            // Show success message
+            alert('Room created successfully!');
+        } else {
+            alert('Error: ' + data.error);
         }
+    })
+    .catch(error => {
+        alert('An error occurred while creating the room.');
     });
 });
 
@@ -433,7 +468,14 @@ function deleteRoom(roomId, roomName) {
                 if (currentRoom == roomId) {
                     switchRoom('general', 'General Chat');
                 }
-                location.reload();
+                
+                // Remove the room from the UI
+                const roomElement = document.querySelector(`[data-room="${roomId}"]`);
+                if (roomElement) {
+                    roomElement.remove();
+                }
+                
+                alert('Room deleted successfully!');
             } else {
                 alert('Error: ' + data.error);
             }
@@ -453,8 +495,9 @@ function clearAllChatData() {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
+                // Clear messages from UI
+                clearMessages();
                 alert('All chat data has been cleared.');
-                location.reload();
             } else {
                 alert('Error: ' + data.error);
             }

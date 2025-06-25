@@ -28,8 +28,8 @@ app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
 # Initialize the app with the extension
 db.init_app(app)
 
-# Initialize SocketIO
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Initialize SocketIO with session handling
+socketio = SocketIO(app, cors_allowed_origins="*", manage_session=False)
 
 with app.app_context():
     # Import models to ensure tables are created
