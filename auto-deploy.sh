@@ -86,11 +86,14 @@ StandardError=append:/var/log/wispr/wispr.log
 WantedBy=multi-user.target
 EOF
 
-# --- Set up Nginx config ---
-cat <<EOF | sudo tee /etc/nginx/sites-available/wispr
+# --- Nginx config ---
+echo "[+] Writing Nginx config..."
+cat > /etc/nginx/sites-available/wispr <<EOF
 server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
+
+    # Redirect all HTTP to HTTPS
     return 301 https://$host$request_uri;
 }
 
@@ -109,17 +112,21 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket support
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
     }
 
+    # Static files
     location /static/ {
         alias /var/www/wispr/static/;
         expires 1y;
         add_header Cache-Control "public, immutable";
     }
 
+    # Security headers
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -127,9 +134,9 @@ server {
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;" always;
-}
+} 
 EOF
-sudo ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
+ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
 sudo nginx -t && sudo systemctl reload nginx
 
 # --- Obtain SSL certificate ---
