@@ -39,14 +39,14 @@ echo "[+] Copying current repo to /var/www/wispr..."
 sudo rsync -a --delete ./ /var/www/wispr/
 sudo chown -R wispr:wispr /var/www/wispr
 
-# --- Set up Python virtual environment ---
+# --- Set up Python virtual environment as wispr user ---
 echo "[+] Setting up Python virtual environment..."
 cd /var/www/wispr
 if [ ! -d "wispr_env" ]; then
-    python3.12 -m venv wispr_env
+    sudo -u wispr python3.12 -m venv wispr_env
 fi
-./wispr_env/bin/pip install --upgrade pip
-./wispr_env/bin/pip install -r requirements.txt
+sudo -u wispr ./wispr_env/bin/pip install --upgrade pip
+sudo -u wispr ./wispr_env/bin/pip install -r requirements.txt
 
 # --- Set permissions ---
 sudo chown -R wispr:wispr /var/www/wispr
