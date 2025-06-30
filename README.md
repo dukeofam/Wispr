@@ -36,6 +36,24 @@ A secure, modern Flask-based team collaboration platform with real-time chat and
    - Open [http://localhost:5000](http://localhost:5000)
    - Username: `admin`  Password: `admin123`
 
+## Automated Production Deployment
+
+You can deploy Wispr to a fresh VPS in minutes using the provided `auto-deploy.sh` script. This script:
+- Installs all required packages (git, python3.12, venv, nginx, certbot, etc)
+- Creates a dedicated `wispr` system user and sets up `/var/www/wispr`
+- Clones the Wispr repo and installs dependencies
+- Sets permissions and creates a secure `.env` file
+- Configures systemd and Nginx for your domain (with SSL and security headers)
+- Obtains a free SSL certificate with Certbot
+- Enables and starts all services
+
+**Usage:**
+```bash
+chmod +x auto-deploy.sh
+./auto-deploy.sh
+```
+Follow the prompts for your domain, email, and session secret. The script is safe to re-run and will not overwrite existing data/configs unless you change your answers.
+
 ## Production Deployment
 
 ### 1. Prepare Environment
