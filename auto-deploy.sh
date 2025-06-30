@@ -1,6 +1,12 @@
 #!/bin/bash
 set -e
 
+# --- Ensure sudo is available and prompt early ---
+if ! sudo -v; then
+    echo "[!] This script requires sudo privileges. Please run as a user with sudo access."
+    exit 1
+fi
+
 # --- Prompt for config ---
 read -p "Enter your domain (e.g. example.com): " DOMAIN
 read -p "Enter your email for SSL certificate: " EMAIL
@@ -28,11 +34,15 @@ else
     exit 1
 fi
 
-# --- Create wispr user and directory ---
+# --- Set up wispr user and /var/www/wispr ---
 echo "[+] Setting up wispr user and /var/www/wispr..."
-sudo adduser --system --group wispr || true
-sudo mkdir -p /var/www/wispr
-sudo chown wispr:wispr /var/www/wispr
+if ! id "wispr" &>/dev/null; then
+    sudo useradd -r -m -d /var/www/wispr -s /usr/sbin/nologin wispr
+    sudo mkdir -p /var/www/wispr
+    sudo chown wispr:wispr /var/www/wispr
+else
+    echo "The system user \`wispr' already exists. Exiting."
+fi
 
 # --- Copy repo and set permissions ---
 echo "[+] Copying current repo to /var/www/wispr..."
@@ -89,9 +99,9 @@ StandardError=append:/var/log/wispr/wispr.log
 WantedBy=multi-user.target
 EOF
 
-# --- Nginx config ---
+# --- Write Nginx config with sudo ---
 echo "[+] Writing Nginx config..."
-cat > /etc/nginx/sites-available/wispr <<EOF
+sudo bash -c "cat > /etc/nginx/sites-available/wispr" <<EOF
 server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
@@ -139,7 +149,9 @@ server {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;" always;
 } 
 EOF
-ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
+
+# --- Symlink and reload Nginx with sudo ---
+sudo ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
 sudo nginx -t && sudo systemctl reload nginx
 
 # --- Obtain SSL certificate ---
