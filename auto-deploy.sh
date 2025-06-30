@@ -34,16 +34,19 @@ sudo adduser --system --group wispr || true
 sudo mkdir -p /var/www/wispr
 sudo chown wispr:wispr /var/www/wispr
 
-# --- Copy current repo to /var/www/wispr ---
+# --- Copy repo and set permissions ---
 echo "[+] Copying current repo to /var/www/wispr..."
-sudo rsync -a --exclude wispr_env --exclude .git --exclude __pycache__ ./ /var/www/wispr/
+sudo rsync -a --delete ./ /var/www/wispr/
 sudo chown -R wispr:wispr /var/www/wispr
 
-# --- Install Python dependencies ---
+# --- Set up Python virtual environment ---
+echo "[+] Setting up Python virtual environment..."
 cd /var/www/wispr
-sudo -u wispr python3.12 -m venv wispr_env
-sudo -u wispr wispr_env/bin/pip install --upgrade pip
-sudo -u wispr wispr_env/bin/pip install -r requirements_standalone.txt
+if [ ! -d "wispr_env" ]; then
+    python3.12 -m venv wispr_env
+fi
+./wispr_env/bin/pip install --upgrade pip
+./wispr_env/bin/pip install -r requirements.txt
 
 # --- Set permissions ---
 sudo chown -R wispr:wispr /var/www/wispr
