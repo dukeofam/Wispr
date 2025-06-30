@@ -81,8 +81,43 @@ sudo mkdir -p /var/log/wispr
 sudo touch /var/log/wispr/wispr.log
 sudo chown -R wispr:wispr /var/log/wispr
 
-# --- Write Nginx config with sudo ---
-echo "[+] Writing Nginx config..."
+# --- Write temporary HTTP-only Nginx config ---
+echo "[+] Writing temporary HTTP-only Nginx config..."
+sudo bash -c "cat > /etc/nginx/sites-available/wispr" <<EOF
+server {
+    listen 80;
+    server_name $DOMAIN www.$DOMAIN;
+    root /var/www/wispr/static;
+    location /static/ {
+        alias /var/www/wispr/static/;
+        expires 1y;
+        add_header Cache-Control \"public, immutable\";
+    }
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection \"upgrade\";
+    }
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
+sudo nginx -t && sudo systemctl reload nginx
+
+# --- Obtain SSL certificate with certbot ---
+echo "[+] Obtaining SSL certificate with certbot..."
+if [ -z "$EMAIL" ]; then
+    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --register-unsafely-without-email --agree-tos --non-interactive || true
+else
+    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN -m $EMAIL --agree-tos --non-interactive || true
+fi
+
+# --- Write full HTTPS Nginx config ---
+echo "[+] Writing full HTTPS Nginx config..."
 sudo bash -c "cat > /etc/nginx/sites-available/wispr" <<EOF
 server {
     listen 80;
@@ -105,32 +140,23 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Connection \"upgrade\";
     }
     location /static/ {
         alias /var/www/wispr/static/;
         expires 1y;
-        add_header Cache-Control "public, immutable";
+        add_header Cache-Control \"public, immutable\";
     }
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;" always;
+    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;
+    add_header X-Frame-Options \"SAMEORIGIN\" always;
+    add_header X-Content-Type-Options \"nosniff\" always;
+    add_header X-XSS-Protection \"1; mode=block\" always;
+    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;
+    add_header Permissions-Policy \"geolocation=(), microphone=(), camera=()\" always;
+    add_header Content-Security-Policy \"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;\" always;
 }
 EOF
-sudo ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
 sudo nginx -t && sudo systemctl reload nginx
-
-# --- Obtain SSL certificate with certbot ---
-echo "[+] Obtaining SSL certificate with certbot..."
-if [ -z "$EMAIL" ]; then
-    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --register-unsafely-without-email --agree-tos --non-interactive || true
-else
-    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN -m $EMAIL --agree-tos --non-interactive || true
-fi
 
 # --- Write systemd service file ---
 echo "[+] Writing systemd service file..."
