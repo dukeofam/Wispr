@@ -4,7 +4,11 @@ set -e
 # --- Prompt for config ---
 read -p "Enter your domain (e.g. wispr.wtf): " DOMAIN
 read -p "Enter your email for SSL certificate: " EMAIL
-read -p "Enter a strong session secret: " SESSION_SECRET
+read -p "Enter a strong session secret (leave empty to generate one): " SESSION_SECRET
+if [ -z "$SESSION_SECRET" ]; then
+    SESSION_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')
+    echo "[+] Generated session secret: $SESSION_SECRET"
+fi
 
 # --- Install system packages ---
 echo "[+] Installing required packages..."
