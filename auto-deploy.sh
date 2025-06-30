@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# --- Ensure sudo is available and prompt early ---
+# --- Prompt for sudo at the start ---
 if ! sudo -v; then
     echo "[!] This script requires sudo privileges. Please run as a user with sudo access."
     exit 1
@@ -9,7 +9,11 @@ fi
 
 # --- Prompt for config ---
 read -p "Enter your domain (e.g. example.com): " DOMAIN
-read -p "Enter your email for SSL certificate: " EMAIL
+while [[ -z "$DOMAIN" ]]; do
+    echo "Domain cannot be blank."
+    read -p "Enter your domain (e.g. example.com): " DOMAIN
+done
+read -p "Enter your email for SSL certificate (optional): " EMAIL
 read -p "Enter a strong session secret (leave empty to generate one): " SESSION_SECRET
 if [ -z "$SESSION_SECRET" ]; then
     SESSION_SECRET=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')
@@ -40,9 +44,9 @@ if ! id "wispr" &>/dev/null; then
     sudo useradd -r -m -d /var/www/wispr -s /usr/sbin/nologin wispr
     sudo mkdir -p /var/www/wispr
     sudo chown wispr:wispr /var/www/wispr
-else
-    echo "The system user \`wispr' already exists. Exiting."
 fi
+sudo mkdir -p /var/www/wispr
+sudo chown -R wispr:wispr /var/www/wispr
 
 # --- Copy repo and set permissions ---
 echo "[+] Copying current repo to /var/www/wispr..."
@@ -58,14 +62,9 @@ fi
 sudo -u wispr ./wispr_env/bin/pip install --upgrade pip
 sudo -u wispr ./wispr_env/bin/pip install -r requirements.txt
 
-# --- Set permissions ---
-sudo chown -R wispr:wispr /var/www/wispr
-sudo find /var/www/wispr -type d -exec chmod 755 {} \;
-sudo find /var/www/wispr -type f -exec chmod 644 {} \;
-sudo chmod 700 /var/www/wispr/backup.sh /var/www/wispr/monitor.sh || true
-
-# --- Create .env ---
-cat <<EOF | sudo tee /var/www/wispr/.env
+# --- Write .env file ---
+echo "[+] Writing .env file..."
+sudo bash -c "cat > /var/www/wispr/.env" <<EOF
 SESSION_SECRET=$SESSION_SECRET
 FLASK_ENV=production
 SESSION_TYPE=filesystem
@@ -74,11 +73,68 @@ DATABASE_URL=sqlite:///team_collaboration.db
 CORS_ALLOWED_ORIGINS=https://$DOMAIN
 LOG_FILE=/var/log/wispr/wispr.log
 EOF
-sudo chmod 600 /var/www/wispr/.env
 sudo chown wispr:wispr /var/www/wispr/.env
 
-# --- Set up systemd service ---
-cat <<EOF | sudo tee /etc/systemd/system/wispr.service
+# --- Set up log directory ---
+echo "[+] Setting up log directory..."
+sudo mkdir -p /var/log/wispr
+sudo touch /var/log/wispr/wispr.log
+sudo chown -R wispr:wispr /var/log/wispr
+
+# --- Write Nginx config with sudo ---
+echo "[+] Writing Nginx config..."
+sudo bash -c "cat > /etc/nginx/sites-available/wispr" <<EOF
+server {
+    listen 80;
+    server_name $DOMAIN www.$DOMAIN;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN www.$DOMAIN;
+    ssl_certificate     /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+    location /static/ {
+        alias /var/www/wispr/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;" always;
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
+sudo nginx -t && sudo systemctl reload nginx
+
+# --- Obtain SSL certificate with certbot ---
+echo "[+] Obtaining SSL certificate with certbot..."
+if [ -z "$EMAIL" ]; then
+    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --register-unsafely-without-email --agree-tos --non-interactive || true
+else
+    sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN -m $EMAIL --agree-tos --non-interactive || true
+fi
+
+# --- Write systemd service file ---
+echo "[+] Writing systemd service file..."
+sudo bash -c "cat > /etc/systemd/system/wispr.service" <<EOF
 [Unit]
 Description=Wispr Team Collaboration Platform
 After=network.target
@@ -89,7 +145,7 @@ User=wispr
 Group=wispr
 WorkingDirectory=/var/www/wispr
 EnvironmentFile=/var/www/wispr/.env
-ExecStart=/var/www/wispr/deploy.sh
+ExecStart=/var/www/wispr/wispr_env/bin/gunicorn -k eventlet -w 1 -b 127.0.0.1:5000 main:app
 Restart=always
 RestartSec=5
 StandardOutput=append:/var/log/wispr/wispr.log
@@ -98,77 +154,14 @@ StandardError=append:/var/log/wispr/wispr.log
 [Install]
 WantedBy=multi-user.target
 EOF
-
-# --- Write Nginx config with sudo ---
-echo "[+] Writing Nginx config..."
-sudo bash -c "cat > /etc/nginx/sites-available/wispr" <<EOF
-server {
-    listen 80;
-    server_name $DOMAIN www.$DOMAIN;
-
-    # Redirect all HTTP to HTTPS
-    return 301 https://$host$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name $DOMAIN www.$DOMAIN;
-
-    ssl_certificate     /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-    ssl_protocols       TLSv1.2 TLSv1.3;
-    ssl_ciphers         HIGH:!aNULL:!MD5;
-
-    location / {
-        proxy_pass http://127.0.0.1:5000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # WebSocket support
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-
-    # Static files
-    location /static/ {
-        alias /var/www/wispr/static/;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
-    }
-
-    # Security headers
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;" always;
-} 
-EOF
-
-# --- Symlink and reload Nginx with sudo ---
-sudo ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
-sudo nginx -t && sudo systemctl reload nginx
-
-# --- Obtain SSL certificate ---
-echo "[+] Obtaining SSL certificate with certbot..."
-sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos -m $EMAIL --redirect || true
-
-# --- Enable and start services ---
 sudo systemctl daemon-reload
-sudo systemctl enable wispr
-sudo systemctl restart wispr
-sudo systemctl restart nginx
+sudo systemctl enable wispr.service
+sudo systemctl restart wispr.service
 
-# --- Final message ---
-echo "[+] Wispr deployed!"
-echo "- App: https://$DOMAIN"
-echo "- Admin login: admin / admin123 (change password immediately)"
-echo "- Systemd service: wispr"
-echo "- Nginx config: /etc/nginx/sites-available/wispr"
-echo "- .env: /var/www/wispr/.env"
-echo "- Logs: /var/log/wispr/wispr.log" 
+# --- Final status ---
+echo "[+] Deployment complete!"
+echo "- Wispr should now be running at: https://$DOMAIN"
+echo "- To check service status: sudo systemctl status wispr.service"
+echo "- To check logs: sudo tail -f /var/log/wispr/wispr.log"
+echo "- To re-run SSL: sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN"
+echo "- To reload Nginx: sudo systemctl reload nginx" 
