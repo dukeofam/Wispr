@@ -28,12 +28,10 @@ sudo adduser --system --group wispr || true
 sudo mkdir -p /var/www/wispr
 sudo chown wispr:wispr /var/www/wispr
 
-# --- Clone or update repo ---
-if [ ! -d /var/www/wispr/.git ]; then
-    sudo -u wispr git clone https://github.com/dukeofam/Wispr.git /var/www/wispr
-else
-    cd /var/www/wispr && sudo -u wispr git pull
-fi
+# --- Copy current repo to /var/www/wispr ---
+echo "[+] Copying current repo to /var/www/wispr..."
+sudo rsync -a --exclude wispr_env --exclude .git --exclude __pycache__ ./ /var/www/wispr/
+sudo chown -R wispr:wispr /var/www/wispr
 
 # --- Install Python dependencies ---
 cd /var/www/wispr
