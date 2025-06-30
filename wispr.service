@@ -1,0 +1,18 @@
+[Unit]
+Description=Wispr Team Collaboration Platform
+After=network.target
+
+[Service]
+Type=simple
+User=wispr
+Group=wispr
+WorkingDirectory=/var/www/wispr
+EnvironmentFile=/var/www/wispr/.env
+ExecStart=/var/www/wispr/deploy.sh
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/wispr/wispr.log
+StandardError=append:/var/log/wispr/wispr.log
+
+[Install]
+WantedBy=multi-user.target 

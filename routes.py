@@ -1,10 +1,11 @@
-from flask import render_template, request, redirect, url_for, session, flash, jsonify
+from flask import render_template, request, redirect, url_for, session, flash, jsonify, Response
 from flask_socketio import emit, join_room, leave_room
-from app import app, db, socketio
+from app import app, db, socketio, limiter
 from models import User, ChatMessage, Task, ChatRoom, MessageAttachment, TaskActivityLog
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 from sqlalchemy import desc
+import logging
 
 # Store online users
 online_users = set()
@@ -48,6 +49,7 @@ def index():
 
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def login():
     if request.method == 'POST':
         username = request.form['username']
@@ -56,13 +58,18 @@ def login():
         user = User.query.filter_by(username=username).first()
 
         if user and user.check_password(password):
+            session.clear()
             session['user_id'] = user.id
             session['username'] = user.username
             session['is_admin'] = user.is_admin
+            session.permanent = True  # Enable session timeout
+            session.modified = True
             flash('Login successful', 'success')
+            logging.info(f"User login: {username} (id={user.id}) from {request.remote_addr}")
             return redirect(url_for('dashboard'))
         else:
             flash('Invalid username or password', 'error')
+            logging.warning(f"Failed login attempt for username: {username} from {request.remote_addr}")
 
     return render_template('login.html')
 
@@ -70,6 +77,7 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear()
+    session.modified = True
     flash('You have been logged out', 'info')
     return redirect(url_for('login'))
 
@@ -121,6 +129,7 @@ def chat():
 
 @app.route('/api/messages')
 @login_required
+@limiter.limit("60 per minute")
 def get_messages():
     """API endpoint to fetch latest messages for real-time updates"""
     since = request.args.get('since')
@@ -148,6 +157,7 @@ def get_messages():
 
 @app.route('/api/room_messages/<room_id>')
 @login_required
+@limiter.limit("60 per minute")
 def get_room_messages(room_id):
     """Get messages for a specific room"""
     if room_id == 'general':
@@ -189,6 +199,7 @@ def get_online_count():
 
 @app.route('/api/direct_messages/<int:user_id>')
 @login_required
+@limiter.limit("60 per minute")
 def get_direct_messages(user_id):
     """Get direct messages between current user and specified user"""
     messages = ChatMessage.query.filter(
@@ -215,6 +226,7 @@ def get_direct_messages(user_id):
 
 @app.route('/api/create_room', methods=['POST'])
 @login_required
+@limiter.limit("20 per hour")
 def create_room():
     name = request.form.get('name', '').strip()
     description = request.form.get('description', '').strip()
@@ -256,6 +268,7 @@ def create_room():
 
 @app.route('/api/delete_room/<int:room_id>', methods=['DELETE'])
 @admin_required
+@limiter.limit("10 per hour")
 def delete_room(room_id):
     """Delete a chat room (admin only)"""
     room = ChatRoom.query.get_or_404(room_id)
@@ -270,6 +283,8 @@ def delete_room(room_id):
     # Delete the room
     db.session.delete(room)
     db.session.commit()
+    
+    logging.info(f"Admin {session['username']} (id={session['user_id']}) deleted room: {room_id}")
     
     return jsonify({'success': True, 'message': f'Room "{room.name}" deleted successfully'})
 
@@ -298,6 +313,7 @@ def clear_all_chat_data():
 
 @app.route('/upload_file', methods=['POST'])
 @login_required
+@limiter.limit("10 per hour")
 def upload_file():
     """Handle file uploads for chat messages"""
     if 'files' not in request.files:
@@ -310,28 +326,32 @@ def upload_file():
     import os
     upload_dir = os.path.join(app.root_path, 'uploads')
     os.makedirs(upload_dir, exist_ok=True)
-    
+
+    # Allowed file extensions and MIME types
+    ALLOWED_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.pdf', '.txt', '.docx'}
+    ALLOWED_MIME_TYPES = {'image/jpeg', 'image/png', 'image/gif', 'application/pdf', 'text/plain', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}
+
     for file in files:
         if file.filename:
+            file_extension = os.path.splitext(file.filename)[1].lower()
+            if file_extension not in ALLOWED_EXTENSIONS or (file.content_type and file.content_type not in ALLOWED_MIME_TYPES):
+                logging.warning(f"Blocked upload of disallowed file type: {file.filename} ({file.content_type}) by user {session['username']} (id={session['user_id']})")
+                continue  # Skip disallowed file types
             # Generate unique filename
             import uuid
-            file_extension = os.path.splitext(file.filename)[1]
             unique_filename = str(uuid.uuid4()) + file_extension
             file_path = os.path.join(upload_dir, unique_filename)
-            
             # Save file
             file.save(file_path)
-            
             # Get file size
             file_size = os.path.getsize(file_path)
-            
             uploaded_files.append({
                 'filename': unique_filename,
                 'original_filename': file.filename,
                 'file_size': file_size,
                 'file_type': file.content_type or 'application/octet-stream'
             })
-    
+    logging.info(f"User {session['username']} (id={session['user_id']}) uploaded a file from {request.remote_addr}")
     return jsonify({'success': True, 'files': uploaded_files})
 
 
@@ -398,8 +418,10 @@ def delete_message(message_id):
 
 @app.route('/kanban', methods=['GET', 'POST'])
 @login_required
+@limiter.limit("20 per hour", methods=["POST"])
 def kanban():
     if request.method == 'POST':
+        logging.info(f"User {session['username']} (id={session['user_id']}) modified Kanban board from {request.remote_addr}")
         title = request.form['title'].strip()
         description = request.form.get('description', '').strip()
         priority = request.form.get('priority', 'medium')
@@ -695,6 +717,7 @@ def admin():
 
 @app.route('/admin/create_user', methods=['POST'])
 @admin_required
+@limiter.limit("10 per hour")
 def create_user():
     username = request.form['username'].strip()
     email = request.form['email'].strip()
@@ -703,6 +726,9 @@ def create_user():
 
     if not username or not email or not password:
         flash('All fields are required', 'error')
+        return redirect(url_for('admin'))
+    if len(password) < 8:
+        flash('Password must be at least 8 characters long', 'error')
         return redirect(url_for('admin'))
 
     # Check if user already exists
@@ -718,11 +744,13 @@ def create_user():
     db.session.add(user)
     db.session.commit()
     flash('User created successfully', 'success')
+    logging.info(f"Admin {session['username']} (id={session['user_id']}) created user: {username}")
     return redirect(url_for('admin'))
 
 
 @app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
 @admin_required
+@limiter.limit("10 per hour")
 def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     # Prevent deleting the default admin account if no other admin exists
@@ -746,6 +774,7 @@ def delete_user(user_id):
     db.session.delete(user)
     db.session.commit()
     flash('User deleted successfully', 'success')
+    logging.info(f"Admin {session['username']} (id={session['user_id']}) deleted user: {user.username} (id={user.id})")
     return redirect(url_for('admin'))
 
 
@@ -1004,3 +1033,29 @@ def handle_stop_typing(data):
         return
     
     emit('user_stopped_typing', {}, room=room_name, include_self=False)
+
+
+@app.route('/healthz')
+def health_check():
+    return 'OK', 200
+
+
+@limiter.request_filter
+def ip_whitelist():
+    # Allow health checks from localhost without rate limiting
+    return request.remote_addr == '127.0.0.1'
+
+
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return Response('Rate limit exceeded. Please try again later.', status=429)
+
+
+@app.errorhandler(404)
+def not_found_error(error):
+    return render_template('404.html'), 404
+
+
+@app.errorhandler(500)
+def internal_error(error):
+    return render_template('500.html'), 500

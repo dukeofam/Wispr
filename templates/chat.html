@@ -234,6 +234,17 @@ document.getElementById('file-input').addEventListener('change', function(e) {
     }
 });
 
+function escapeHtml(text) {
+    const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+    };
+    return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+}
+
 function addMessageToChat(data) {
     const messagesContainer = document.getElementById('messages-container');
     const messageDiv = document.createElement('div');
@@ -245,14 +256,14 @@ function addMessageToChat(data) {
 
     messageDiv.innerHTML = `
         <div class="d-flex justify-content-between align-items-start">
-            <div class="message-header">
-                <strong class="${isOwnMessage ? 'text-success' : 'text-primary'}">${data.username}</strong>
+            <div>
+                <strong>${escapeHtml(data.username)}</strong>
                 ${data.is_admin ? '<span class="badge bg-danger ms-1">Admin</span>' : ''}
                 <small class="text-muted ms-2">${timestamp}</small>
             </div>
             ${isOwnMessage ? `
             <div class="message-actions">
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editMessage(${data.id}, '${data.content.replace(/'/g, "\\'")}')">
+                <button class="btn btn-sm btn-outline-primary me-1" onclick="editMessage(${data.id}, '${escapeHtml(data.content).replace(/'/g, "\\'")}')">
                     <i class="bi bi-pencil"></i>
                 </button>
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteMessage(${data.id})">
@@ -262,7 +273,7 @@ function addMessageToChat(data) {
             ` : ''}
         </div>
         <div class="message-content mt-2">
-            <p class="mb-0" id="message-content-${data.id}">${data.content.replace(/\n/g, '<br>')}</p>
+            <p class="mb-0" id="message-content-${data.id}">${escapeHtml(data.content).replace(/\n/g, '<br>')}</p>
             ${data.attachments ? renderAttachments(data.attachments) : ''}
         </div>
     `;

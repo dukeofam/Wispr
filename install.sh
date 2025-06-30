@@ -96,6 +96,10 @@ install_dependencies() {
 
 # Create run.sh
 create_run_script() {
+    if [ -f run.sh ]; then
+        echo "run.sh already exists, skipping creation."
+        return
+    fi
     echo "📝 Creating run.sh..."
     cat > run.sh << 'EOF'
 #!/bin/bash

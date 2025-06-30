@@ -1,0 +1,144 @@
+#!/bin/bash
+set -e
+
+# --- Prompt for config ---
+read -p "Enter your domain (e.g. wispr.wtf): " DOMAIN
+read -p "Enter your email for SSL certificate: " EMAIL
+read -p "Enter a strong session secret: " SESSION_SECRET
+
+# --- Install system packages ---
+echo "[+] Installing required packages..."
+if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update
+    sudo apt-get install -y git python3.12 python3.12-venv python3.12-dev python3-pip nginx certbot python3-certbot-nginx
+elif command -v yum >/dev/null 2>&1; then
+    sudo yum install -y git python3 python3-pip python3-venv nginx certbot python3-certbot-nginx
+else
+    echo "[!] Unsupported OS. Please install git, python3.12, venv, nginx, and certbot manually."
+    exit 1
+fi
+
+# --- Create wispr user and directory ---
+echo "[+] Setting up wispr user and /var/www/wispr..."
+sudo adduser --system --group wispr || true
+sudo mkdir -p /var/www/wispr
+sudo chown wispr:wispr /var/www/wispr
+
+# --- Clone or update repo ---
+if [ ! -d /var/www/wispr/.git ]; then
+    sudo -u wispr git clone https://github.com/dukeofam/Wispr.git /var/www/wispr
+else
+    cd /var/www/wispr && sudo -u wispr git pull
+fi
+
+# --- Install Python dependencies ---
+cd /var/www/wispr
+sudo -u wispr python3.12 -m venv wispr_env
+sudo -u wispr wispr_env/bin/pip install --upgrade pip
+sudo -u wispr wispr_env/bin/pip install -r requirements_standalone.txt
+
+# --- Set permissions ---
+sudo chown -R wispr:wispr /var/www/wispr
+sudo find /var/www/wispr -type d -exec chmod 755 {} \;
+sudo find /var/www/wispr -type f -exec chmod 644 {} \;
+sudo chmod 700 /var/www/wispr/backup.sh /var/www/wispr/monitor.sh || true
+
+# --- Create .env ---
+cat <<EOF | sudo tee /var/www/wispr/.env
+SESSION_SECRET=$SESSION_SECRET
+FLASK_ENV=production
+SESSION_TYPE=filesystem
+SESSION_FILE_DIR=/var/www/wispr/sessions
+DATABASE_URL=sqlite:///team_collaboration.db
+CORS_ALLOWED_ORIGINS=https://$DOMAIN
+LOG_FILE=/var/log/wispr/wispr.log
+EOF
+sudo chmod 600 /var/www/wispr/.env
+sudo chown wispr:wispr /var/www/wispr/.env
+
+# --- Set up systemd service ---
+cat <<EOF | sudo tee /etc/systemd/system/wispr.service
+[Unit]
+Description=Wispr Team Collaboration Platform
+After=network.target
+
+[Service]
+Type=simple
+User=wispr
+Group=wispr
+WorkingDirectory=/var/www/wispr
+EnvironmentFile=/var/www/wispr/.env
+ExecStart=/var/www/wispr/deploy.sh
+Restart=always
+RestartSec=5
+StandardOutput=append:/var/log/wispr/wispr.log
+StandardError=append:/var/log/wispr/wispr.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# --- Set up Nginx config ---
+cat <<EOF | sudo tee /etc/nginx/sites-available/wispr
+server {
+    listen 80;
+    server_name $DOMAIN www.$DOMAIN;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN www.$DOMAIN;
+
+    ssl_certificate     /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_ciphers         HIGH:!aNULL:!MD5;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    location /static/ {
+        alias /var/www/wispr/static/;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;" always;
+}
+EOF
+sudo ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
+sudo nginx -t && sudo systemctl reload nginx
+
+# --- Obtain SSL certificate ---
+echo "[+] Obtaining SSL certificate with certbot..."
+sudo certbot --nginx -d $DOMAIN -d www.$DOMAIN --non-interactive --agree-tos -m $EMAIL --redirect || true
+
+# --- Enable and start services ---
+sudo systemctl daemon-reload
+sudo systemctl enable wispr
+sudo systemctl restart wispr
+sudo systemctl restart nginx
+
+# --- Final message ---
+echo "[+] Wispr deployed!"
+echo "- App: https://$DOMAIN"
+echo "- Admin login: admin / admin123 (change password immediately)"
+echo "- Systemd service: wispr"
+echo "- Nginx config: /etc/nginx/sites-available/wispr"
+echo "- .env: /var/www/wispr/.env"
+echo "- Logs: /var/log/wispr/wispr.log" 
