@@ -2,7 +2,7 @@
 set -e
 
 # --- Prompt for config ---
-read -p "Enter your domain (e.g. wispr.wtf): " DOMAIN
+read -p "Enter your domain (e.g. example.com): " DOMAIN
 read -p "Enter your email for SSL certificate: " EMAIL
 read -p "Enter a strong session secret: " SESSION_SECRET
 
