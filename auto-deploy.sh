@@ -91,7 +91,7 @@ server {
     location /static/ {
         alias /var/www/wispr/static/;
         expires 1y;
-        add_header Cache-Control \"public, immutable\";
+        add_header Cache-Control "public, immutable";
     }
     location / {
         proxy_pass http://127.0.0.1:5000;
@@ -101,7 +101,7 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Connection "upgrade";
     }
 }
 EOF
@@ -140,20 +140,20 @@ server {
         proxy_set_header X-Forwarded-Proto \$scheme;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection \"upgrade\";
+        proxy_set_header Connection "upgrade";
     }
     location /static/ {
         alias /var/www/wispr/static/;
         expires 1y;
-        add_header Cache-Control \"public, immutable\";
+        add_header Cache-Control "public, immutable";
     }
-    add_header Strict-Transport-Security \"max-age=31536000; includeSubDomains\" always;
-    add_header X-Frame-Options \"SAMEORIGIN\" always;
-    add_header X-Content-Type-Options \"nosniff\" always;
-    add_header X-XSS-Protection \"1; mode=block\" always;
-    add_header Referrer-Policy \"strict-origin-when-cross-origin\" always;
-    add_header Permissions-Policy \"geolocation=(), microphone=(), camera=()\" always;
-    add_header Content-Security-Policy \"default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;\" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;" always;
 }
 EOF
 sudo nginx -t && sudo systemctl reload nginx
