@@ -13,7 +13,13 @@ fi
 # --- Install system packages ---
 echo "[+] Installing required packages..."
 if command -v apt-get >/dev/null 2>&1; then
-    sudo apt-get update
+    if ! command -v python3.12 >/dev/null 2>&1; then
+        echo "[+] Adding deadsnakes PPA for Python 3.12..."
+        sudo apt-get update
+        sudo apt-get install -y software-properties-common
+        sudo add-apt-repository ppa:deadsnakes/ppa -y
+        sudo apt-get update
+    fi
     sudo apt-get install -y git python3.12 python3.12-venv python3.12-dev python3-pip nginx certbot python3-certbot-nginx
 elif command -v yum >/dev/null 2>&1; then
     sudo yum install -y git python3 python3-pip python3-venv nginx certbot python3-certbot-nginx
