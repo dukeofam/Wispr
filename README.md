@@ -135,7 +135,7 @@ Wispr/
 ├── main.py          # Entry point
 ├── models.py        # Database models
 ├── routes.py        # Routes and logic
-├── requirements_standalone.txt
+├── requirements.txt
 ├── install.sh       # Installer
 ├── run.sh           # Dev runner
 ├── deploy.sh        # Production runner

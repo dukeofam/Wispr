@@ -87,8 +87,8 @@ ensure_pip() {
 # Install Python dependencies
 install_dependencies() {
     echo "📦 Installing Python dependencies..."
-    if [ -f "requirements_standalone.txt" ]; then
-        pip install -r requirements_standalone.txt
+    if [ -f "requirements.txt" ]; then
+        pip install -r requirements.txt
     else
         pip install Flask==3.0.0 Flask-SQLAlchemy==3.1.1 SQLAlchemy==2.0.23 Werkzeug==3.0.1 email-validator==2.1.0 gunicorn==21.2.0
     fi
