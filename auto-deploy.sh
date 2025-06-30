@@ -106,7 +106,14 @@ server {
 }
 EOF
 sudo ln -sf /etc/nginx/sites-available/wispr /etc/nginx/sites-enabled/wispr
-sudo nginx -t && sudo systemctl reload nginx
+sudo nginx -t
+if ! systemctl is-active --quiet nginx; then
+    echo "[+] Nginx is not running. Starting nginx..."
+    sudo systemctl start nginx
+else
+    echo "[+] Reloading nginx..."
+    sudo systemctl reload nginx
+fi
 
 # --- Obtain SSL certificate with certbot ---
 echo "[+] Obtaining SSL certificate with certbot..."
@@ -156,7 +163,14 @@ server {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net https://cdn.replit.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdn.replit.com;" always;
 }
 EOF
-sudo nginx -t && sudo systemctl reload nginx
+sudo nginx -t
+if ! systemctl is-active --quiet nginx; then
+    echo "[+] Nginx is not running. Starting nginx..."
+    sudo systemctl start nginx
+else
+    echo "[+] Reloading nginx..."
+    sudo systemctl reload nginx
+fi
 
 # --- Write systemd service file ---
 echo "[+] Writing systemd service file..."
