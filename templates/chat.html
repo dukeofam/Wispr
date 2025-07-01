@@ -30,7 +30,7 @@
                 <button class="btn btn-outline-primary btn-sm w-100 mb-2" data-bs-toggle="modal" data-bs-target="#createRoomModal">
                     <i class="bi bi-plus"></i> Create Room
                 </button>
-                <button class="btn btn-outline-danger btn-sm w-100" onclick="clearAllChatData()">
+                <button class="btn btn-outline-danger btn-sm w-100" id="clear-chat-btn">
                     <i class="bi bi-trash"></i> Clear All Chat Data
                 </button>
                 {% endif %}
@@ -46,7 +46,7 @@
                 <div class="list-group list-group-flush">
                     {% for user in users %}
                     {% if user.id != current_user.id %}
-                    <a href="#" class="list-group-item list-group-item-action" onclick="switchToDM('{{ user.id }}', '{{ user.username }}')">
+                    <a href="#" class="list-group-item list-group-item-action dm-user-link" data-user-id="{{ user.id }}" data-username="{{ user.username }}">
                         <i class="bi bi-person-circle"></i> {{ user.username }}
                         {% if user.role == 'admin' %}<span class="badge bg-danger ms-1">Admin</span>{% endif %}
                     </a>
@@ -93,7 +93,7 @@
                 <form id="message-form" enctype="multipart/form-data">
                     <div class="input-group">
                         <input type="file" id="file-input" multiple style="display: none;" accept="*/*">
-                        <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('file-input').click()">
+                        <button type="button" class="btn btn-outline-secondary" id="file-upload-btn">
                             <i class="bi bi-paperclip"></i>
                         </button>
                         <input type="text" id="message-input" class="form-control" placeholder="Type your message..." autocomplete="off">

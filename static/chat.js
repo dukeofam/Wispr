@@ -841,3 +841,28 @@ if (onlineUsersBadge) {
         }, 100);
     });
 }
+
+// --- CSP-compliant event handlers for chat.html ---
+document.addEventListener('DOMContentLoaded', function() {
+    // Clear All Chat Data button
+    const clearBtn = document.getElementById('clear-chat-btn');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearAllChatData);
+    }
+    // DM user links
+    document.querySelectorAll('.dm-user-link').forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const userId = this.getAttribute('data-user-id');
+            const username = this.getAttribute('data-username');
+            switchToDM(userId, username);
+        });
+    });
+    // File upload button
+    const fileBtn = document.getElementById('file-upload-btn');
+    if (fileBtn) {
+        fileBtn.addEventListener('click', function() {
+            document.getElementById('file-input').click();
+        });
+    }
+});

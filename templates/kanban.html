@@ -67,7 +67,7 @@
             <div class="card-body">
                 {% if projects %}
                 <div class="projects-badges-row">
-                    <span class="all-projects-badge" id="all-projects-badge">All Projects</span>
+                    <span id="all-projects-badge" class="all-projects-badge project-filter-badge">All Projects</span>
                     {% for project in projects %}
                     <span class="badge project-badge" onclick="filterByProject({{ project.id }})" id="project-badge-{{ project.id }}">{{ project.name }}</span>
                     {% endfor %}
@@ -167,13 +167,13 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="card-title mb-1">{{ task.title }}</h6>
-                            <span class="badge bg-primary project-badge-on-task" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
+                            <span class="badge bg-primary project-badge-on-task project-filter-badge" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
                             <div class="dropdown">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                     <i class="bi bi-three-dots"></i>
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="#" onclick="openTaskModal({{ task.id }})">
+                                    <li><a href="#" class="dropdown-item open-task-modal" data-task-id="{{ task.id }}">
                                         <i class="bi bi-eye"></i> View Details
                                     </a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='in_progress') }}">
@@ -239,13 +239,13 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="card-title mb-1">{{ task.title }}</h6>
-                            <span class="badge bg-primary project-badge-on-task" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
+                            <span class="badge bg-primary project-badge-on-task project-filter-badge" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
                             <div class="dropdown">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                     <i class="bi bi-three-dots"></i>
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="#" onclick="openTaskModal({{ task.id }})">
+                                    <li><a href="#" class="dropdown-item open-task-modal" data-task-id="{{ task.id }}">
                                         <i class="bi bi-eye"></i> View Details
                                     </a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='todo') }}">
@@ -311,13 +311,13 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="card-title mb-1">{{ task.title }}</h6>
-                            <span class="badge bg-primary project-badge-on-task" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
+                            <span class="badge bg-primary project-badge-on-task project-filter-badge" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
                             <div class="dropdown">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                     <i class="bi bi-three-dots"></i>
                                 </button>
                                 <ul class="dropdown-menu">
-                                    <li><a class="dropdown-item" href="#" onclick="openTaskModal({{ task.id }})">
+                                    <li><a href="#" class="dropdown-item open-task-modal" data-task-id="{{ task.id }}">
                                         <i class="bi bi-eye"></i> View Details
                                     </a></li>
                                     <li><a class="dropdown-item" href="{{ url_for('update_task_status', task_id=task.id, status='todo') }}">
@@ -444,262 +444,7 @@
 </div>
 {% endif %}
 
-<script>
-window.CSRF_TOKEN = "{{ csrf_token() }}";
-
-function openTaskModal(taskId) {
-    const modal = new bootstrap.Modal(document.getElementById('taskModal'));
-    document.getElementById('taskModalBody').innerHTML = `
-        <div class="d-flex justify-content-center">
-            <div class="spinner-border" role="status">
-                <span class="visually-hidden">Loading...</span>
-            </div>
-        </div>
-    `;
-    modal.show();
-    
-    // Load task details
-    fetch(`/api/task/${taskId}`)
-        .then(response => response.json())
-        .then(task => {
-            document.getElementById('taskModalTitle').textContent = task.title;
-            document.getElementById('taskModalBody').innerHTML = `
-                <div class="mb-3">
-                    <h6>Description</h6>
-                    <p>${task.description || 'No description provided'}</p>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <h6>Priority</h6>
-                        <span class="badge bg-${task.priority === 'high' ? 'danger' : task.priority === 'medium' ? 'warning' : 'secondary'}">${task.priority}</span>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Status</h6>
-                        <span class="badge bg-info">${task.status.replace('_', ' ')}</span>
-                    </div>
-                </div>
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <h6>Created by</h6>
-                        <p>${task.creator}</p>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Assigned to</h6>
-                        <p>${task.assignee || 'Unassigned'}</p>
-                    </div>
-                </div>
-                ${task.due_date ? `<div class="mb-3"><h6>Due Date</h6><p>${task.due_date}</p></div>` : ''}
-                <div class="mb-3">
-                    <h6>Comments</h6>
-                    <div id="comments-${taskId}">Loading comments...</div>
-                    <div class="mt-2">
-                        <textarea class="form-control mb-2" id="new-comment-${taskId}" placeholder="Add a comment..." rows="2"></textarea>
-                        <button class="btn btn-primary btn-sm" onclick="addComment(${taskId})">Add Comment</button>
-                    </div>
-                </div>
-                <div class="mb-3">
-                    <h6>Activity Log</h6>
-                    <div id="activity-${taskId}">Loading activity...</div>
-                </div>
-            `;
-            
-            // Load comments and activity
-            loadComments(taskId);
-            loadActivity(taskId);
-        })
-        .catch(error => {
-            document.getElementById('taskModalBody').innerHTML = '<p class="text-danger">Error loading task details</p>';
-        });
-}
-
-function loadComments(taskId) {
-    fetch(`/api/task/${taskId}/comments`)
-        .then(response => response.json())
-        .then(comments => {
-            const commentsDiv = document.getElementById(`comments-${taskId}`);
-            if (comments.length === 0) {
-                commentsDiv.innerHTML = '<p class="text-muted">No comments yet</p>';
-            } else {
-                commentsDiv.innerHTML = comments.map(comment => `
-                    <div class="border-bottom mb-2 pb-2">
-                        <strong>${comment.author}</strong> 
-                        <small class="text-muted">${new Date(comment.created_at).toLocaleString()}</small>
-                        <p class="mb-0">${comment.content}</p>
-                    </div>
-                `).join('');
-            }
-        });
-}
-
-function loadActivity(taskId) {
-    fetch(`/api/task/${taskId}/activity`)
-        .then(response => response.json())
-        .then(activities => {
-            const activityDiv = document.getElementById(`activity-${taskId}`);
-            if (activities.length === 0) {
-                activityDiv.innerHTML = '<p class="text-muted">No activity yet</p>';
-            } else {
-                activityDiv.innerHTML = activities.map(activity => `
-                    <div class="border-bottom mb-2 pb-2">
-                        <strong>${activity.user}</strong> ${activity.action.replace('_', ' ')}
-                        <small class="text-muted d-block">${new Date(activity.created_at).toLocaleString()}</small>
-                        ${activity.details ? `<small class="text-muted">${activity.details}</small>` : ''}
-                    </div>
-                `).join('');
-            }
-        });
-}
-
-function addComment(taskId) {
-    const textarea = document.getElementById(`new-comment-${taskId}`);
-    const content = textarea.value.trim();
-    
-    if (!content) return;
-    
-    fetch(`/api/task/${taskId}/comment`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ content: content })
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            textarea.value = '';
-            loadComments(taskId);
-            loadActivity(taskId);
-        }
-    });
-}
-
-// --- Project Template Management (Admin) ---
-function showToast(msg, type='success') {
-    let toast = document.createElement('div');
-    toast.className = 'wispr-toast';
-    toast.style.position = 'fixed';
-    toast.style.bottom = '32px';
-    toast.style.right = '32px';
-    toast.style.background = type === 'success' ? '#28a745' : '#dc3545';
-    toast.style.color = '#fff';
-    toast.style.padding = '16px 24px';
-    toast.style.borderRadius = '8px';
-    toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
-    toast.style.fontSize = '1rem';
-    toast.style.zIndex = 9999;
-    toast.textContent = msg;
-    document.body.appendChild(toast);
-    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
-}
-
-// CREATE
-const createForm = document.getElementById('create-project-form');
-if (createForm) {
-    createForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const name = document.getElementById('project-name').value.trim();
-        const description = document.getElementById('project-description').value.trim();
-        fetch('/api/projects', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': window.CSRF_TOKEN
-            },
-            body: JSON.stringify({name, description})
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Project created!');
-                location.reload();
-            } else {
-                showToast(data.error || 'Error creating project', 'error');
-            }
-        })
-        .catch(() => showToast('Error creating project', 'error'));
-    });
-}
-
-// DELETE
-window.deleteProject = function(projectId) {
-    if (!confirm('Are you sure you want to delete this project?')) return;
-    fetch(`/api/projects/${projectId}`, {
-        method: 'DELETE',
-        headers: {'X-CSRFToken': window.CSRF_TOKEN}
-    })
-    .then(r => r.json())
-    .then(data => {
-        if (data.success) {
-            showToast('Project deleted!');
-            location.reload();
-        } else {
-            showToast(data.error || 'Error deleting project', 'error');
-        }
-    })
-    .catch(() => showToast('Error deleting project', 'error'));
-}
-
-// EDIT
-window.openEditProjectModal = function(id, name, description) {
-    document.getElementById('edit-project-id').value = id;
-    document.getElementById('edit-project-name').value = name;
-    document.getElementById('edit-project-description').value = description;
-    new bootstrap.Modal(document.getElementById('editProjectModal')).show();
-}
-const editForm = document.getElementById('edit-project-form');
-if (editForm) {
-    editForm.addEventListener('submit', function(e) {
-        e.preventDefault();
-        const id = document.getElementById('edit-project-id').value;
-        const name = document.getElementById('edit-project-name').value.trim();
-        const description = document.getElementById('edit-project-description').value.trim();
-        fetch(`/api/projects/${id}`, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': window.CSRF_TOKEN
-            },
-            body: JSON.stringify({name, description})
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Project updated!');
-                location.reload();
-            } else {
-                showToast(data.error || 'Error updating project', 'error');
-            }
-        })
-        .catch(() => showToast('Error updating project', 'error'));
-    });
-}
-
-function clearAllProjectHighlights() {
-    document.querySelectorAll('.project-badge, .all-projects-badge').forEach(b => b.classList.remove('active'));
-}
-function filterByProject(projectId) {
-    clearAllProjectHighlights();
-    const badge = document.getElementById('project-badge-' + projectId);
-    if (badge) badge.classList.add('active');
-    document.querySelectorAll('.task-card').forEach(card => {
-        const taskProjectId = card.querySelector('.badge.project-badge-on-task')?.dataset.projectId;
-        if (String(taskProjectId) === String(projectId)) {
-            card.style.display = '';
-        } else {
-            card.style.display = 'none';
-        }
-    });
-}
-document.getElementById('all-projects-badge').onclick = function() {
-    clearAllProjectHighlights();
-    this.classList.add('active');
-    document.querySelectorAll('.task-card').forEach(card => {
-        card.style.display = '';
-    });
-};
-window.addEventListener('DOMContentLoaded', function() {
-    clearAllProjectHighlights();
-    document.getElementById('all-projects-badge').classList.add('active');
-});
-</script>
+{% block scripts %}
+<script src="{{ url_for('static', filename='kanban.js') }}"></script>
+{% endblock %}
 {% endblock %}
