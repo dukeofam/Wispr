@@ -147,13 +147,28 @@ socket.on('connect', function() {
     socket.emit('join_room', {room: 'general'});
 });
 
-// Handle receiving messages
+// --- Wispr Chat Main Logic (CSP-safe, robust) ---
+
+// Defensive: Only call addMessageToChat for valid user messages
+function isValidUserMessage(data) {
+    return data && typeof data === 'object' && typeof data.username === 'string' && typeof data.content === 'string';
+}
+
+// Defensive: Only call addSystemMessage for system messages
+function isSystemMessage(data) {
+    return data && typeof data.message === 'string' && (typeof data.username === 'undefined');
+}
+
+// Socket event: receive_message
 socket.on('receive_message', function(data) {
-    if (data && typeof data.username !== 'undefined' && typeof data.content !== 'undefined') {
+    if (isValidUserMessage(data)) {
         addMessageToChat(data);
-        document.getElementById('no-messages').style.display = 'none';
-    } else if (data && data.message) {
+        const noMsg = document.getElementById('no-messages');
+        if (noMsg) noMsg.style.display = 'none';
+    } else if (isSystemMessage(data)) {
         addSystemMessage(data.message);
+    } else {
+        console.warn('[receive_message] Ignored malformed or unknown message:', data);
     }
 });
 
@@ -317,24 +332,34 @@ if (document.getElementById('message-form')) {
     });
 }
 
-// Patch loadDirectMessages to decrypt DMs
+// Defensive: Patch loadRoomMessages and loadDirectMessages
+function loadRoomMessages(roomId) {
+    fetch(`/api/room_messages/${roomId}`)
+        .then(response => response.json())
+        .then(messages => {
+            if (Array.isArray(messages) && messages.length > 0) {
+                const noMsg = document.getElementById('no-messages');
+                if (noMsg) noMsg.style.display = 'none';
+                messages.filter(isValidUserMessage).forEach(addMessageToChat);
+                const malformed = messages.filter(m => !isValidUserMessage(m));
+                if (malformed.length > 0) console.warn('[loadRoomMessages] Malformed:', malformed);
+            }
+        });
+}
 function loadDirectMessages(userId) {
-    console.log('[DM] loadDirectMessages called for userId:', userId);
     fetch(`/api/direct_messages/${userId}`)
         .then(response => response.json())
         .then(async messages => {
-            if (messages.length > 0) {
-                document.getElementById('no-messages').style.display = 'none';
-                const validMessages = messages.filter(message => message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined');
-                const malformed = messages.filter(message => !message || typeof message.username === 'undefined' || typeof message.content === 'undefined');
-                if (malformed.length > 0) {
-                    console.warn('Malformed DM messages in history:', malformed);
-                }
-                for (const message of validMessages) {
-                    if (currentDMUser && message.is_direct_message) {
+            if (Array.isArray(messages) && messages.length > 0) {
+                const noMsg = document.getElementById('no-messages');
+                if (noMsg) noMsg.style.display = 'none';
+                for (const message of messages) {
+                    if (isValidUserMessage(message) && message.is_direct_message) {
                         message.content = await decryptDM(message.content, message.username === window.CHAT_CONTEXT.username ? currentDMUser : message.username);
+                        addMessageToChat(message);
+                    } else if (!isValidUserMessage(message)) {
+                        console.warn('[loadDirectMessages] Malformed:', message);
                     }
-                    addMessageToChat(message);
                 }
             }
         });
@@ -651,22 +676,6 @@ function switchRoom(roomId, roomName) {
 function clearMessages() {
     const container = document.getElementById('messages-container');
     container.innerHTML = '<div class="text-center text-muted py-5" id="no-messages"><i class="bi bi-chat-dots fs-1"></i><h4>No messages yet</h4><p>Be the first to start the conversation!</p></div>';
-}
-
-function loadRoomMessages(roomId) {
-    fetch(`/api/room_messages/${roomId}`)
-        .then(response => response.json())
-        .then(messages => {
-            if (messages.length > 0) {
-                document.getElementById('no-messages').style.display = 'none';
-                const validMessages = messages.filter(message => message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined');
-                const malformed = messages.filter(message => !message || typeof message.username === 'undefined' || typeof message.content === 'undefined');
-                if (malformed.length > 0) {
-                    console.warn('Malformed messages in history:', malformed);
-                }
-                validMessages.forEach(message => addMessageToChat(message));
-            }
-        });
 }
 
 function showTypingIndicator(username) {

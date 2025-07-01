@@ -144,13 +144,6 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-<script>
-window.CHAT_CONTEXT = {
-    username: '{{ current_user.username }}',
-    user_id: {{ current_user.id }},
-    role: '{{ current_user.role }}'
-};
-</script>
+<script src="{{ url_for('static', filename='chat-context.js') }}"></script>
 <script src="{{ url_for('static', filename='chat.js') }}"></script>
 {% endblock %}
