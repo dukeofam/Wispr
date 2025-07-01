@@ -92,8 +92,8 @@ sudo chown -R wispr:wispr /var/log/wispr
 
 # --- Remove old database for a clean deploy
 if [ -f instance/team_collaboration.db ]; then
-    echo "Removing old database..."
-    rm instance/team_collaboration.db
+    echo "Removing old database (with sudo)..."
+    sudo rm -f instance/team_collaboration.db
 fi
 
 # --- Write temporary HTTP-only Nginx config ---
