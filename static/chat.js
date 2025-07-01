@@ -632,7 +632,13 @@ function loadRoomMessages(roomId) {
         .then(messages => {
             if (messages.length > 0) {
                 document.getElementById('no-messages').style.display = 'none';
-                messages.forEach(message => addMessageToChat(message));
+                messages.forEach(message => {
+                    if (message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined') {
+                        addMessageToChat(message);
+                    } else {
+                        console.warn('Malformed message in history:', message);
+                    }
+                });
             }
         });
 }
@@ -643,7 +649,13 @@ function loadDirectMessages(userId) {
         .then(messages => {
             if (messages.length > 0) {
                 document.getElementById('no-messages').style.display = 'none';
-                messages.forEach(message => addMessageToChat(message));
+                messages.forEach(message => {
+                    if (message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined') {
+                        addMessageToChat(message);
+                    } else {
+                        console.warn('Malformed DM message in history:', message);
+                    }
+                });
             }
         });
 }
