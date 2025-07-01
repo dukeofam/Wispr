@@ -33,7 +33,6 @@ A secure, modern **Flask-based team collaboration platform** with real-time chat
    ```bash
    git clone https://github.com/dukeofam/Wispr.git
    cd Wispr
-   sudo chmod +x fix_install.sh && sudo ./fix_install.sh
    sudo chmod +x install.sh && sudo ./install.sh
    ```
 

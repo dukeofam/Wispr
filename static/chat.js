@@ -567,28 +567,17 @@ socket.on('user_status_update', function(data) {
     });
 });
 
-// Patch addMessageToChat to show status dot next to username (always use current status)
+// Defensive addMessageToChat
 window.origAddMessageToChat_status = window.addMessageToChat;
 window.addMessageToChat = function(data) {
-    // Defensive check for missing username or content
     if (!data || typeof data !== 'object' || typeof data.username === 'undefined' || typeof data.content === 'undefined') {
-        console.warn('Malformed or system message received in addMessageToChat:', data);
+        console.warn('[addMessageToChat] Malformed or system message:', data);
         return;
     }
     // Store the original username for status lookup
     data.raw_username = data.raw_username || data.username;
     const uname = (data.raw_username || data.username).toLowerCase();
-    // No status dot in chat messages
     const messagesContainer = document.getElementById('messages-container');
-    if (!data || typeof data !== 'object' || typeof data.username === 'undefined' || typeof data.content === 'undefined') {
-        const msg = (data && data.message) ? data.message : '[system message]';
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'text-center text-muted mb-3';
-        messageDiv.innerHTML = `<small><i>${escapeHtml(msg)}</i></small>`;
-        messagesContainer.appendChild(messageDiv);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        return;
-    }
     const messageDiv = document.createElement('div');
     messageDiv.className = 'message-item border-bottom pb-3 mb-3';
     messageDiv.setAttribute('data-message-id', data.id);
@@ -608,47 +597,10 @@ window.addMessageToChat = function(data) {
     }
     let parentPreview = '';
     if (isReply && data.parent_username && data.parent_content) {
-        parentPreview = `
-            <div class="reply-preview mb-2 p-2 bg-light rounded" style="font-size: 0.9em; border-left: 3px solid #007bff;">
-                <small class="text-muted">Replying to <strong>${escapeHtml(data.parent_username)}</strong></small>
-                <div class="text-truncate">${escapeHtml(data.parent_content)}</div>
-            </div>
-        `;
+        parentPreview = `\n            <div class=\"reply-preview mb-2 p-2 bg-light rounded\" style=\"font-size: 0.9em; border-left: 3px solid #007bff;\">\n                <small class=\"text-muted\">Replying to <strong>${escapeHtml(data.parent_username)}</strong></small>\n                <div class=\"text-truncate\">${escapeHtml(data.parent_content)}</div>\n            </div>\n        `;
     }
     let avatarUrl = data.profile_pic ? `/uploads/${data.profile_pic}` : '/static/default_avatar.png';
-    messageDiv.innerHTML = `
-        ${parentPreview}
-        <div class="d-flex align-items-center mb-1">
-            <img src="${avatarUrl}" class="rounded-circle me-2" width="32" height="32" alt="avatar">
-            <strong class="me-2">${escapeHtml(data.username)}</strong>
-            <span class="text-muted small">${timestamp}</span>
-            <div class="ms-auto message-actions">
-                ${isOwnMessage ? `
-                <button class="btn btn-sm btn-outline-primary me-1" onclick="editMessage(${data.id}, '${escapeHtml(data.content).replace(/'/g, "\\'")}')">
-                    <i class="bi bi-pencil"></i>
-                </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteMessage(${data.id})">
-                    <i class="bi bi-trash"></i>
-                </button>
-                ` : ''}
-            </div>
-        </div>
-        <div class="message-content mt-2">
-            <p class="mb-0" id="message-content-${data.id}">${escapeHtml(data.content).replace(/\n/g, '<br>')}</p>
-            ${data.attachments ? renderAttachments(data.attachments) : ''}
-        </div>
-    `;
-    messageDiv.addEventListener('click', function(e) {
-        if (e.target.closest('.message-actions') || e.target.closest('button')) {
-            return;
-        }
-        if (isOwnMessage) {
-            document.querySelectorAll('.message-item').forEach(item => {
-                item.classList.remove('selected');
-            });
-            this.classList.toggle('selected');
-        }
-    });
+    messageDiv.innerHTML = `\n        ${parentPreview}\n        <div class=\"d-flex align-items-center mb-1\">\n            <img src=\"${avatarUrl}\" class=\"rounded-circle me-2\" width=\"32\" height=\"32\" alt=\"avatar\">\n            <strong class=\"me-2\">${escapeHtml(data.username)}</strong>\n            <span class=\"text-muted small\">${timestamp}</span>\n            <div class=\"ms-auto message-actions\">\n                ${isOwnMessage ? `\n                <button class=\"btn btn-sm btn-outline-primary me-1\" onclick=\"editMessage(${data.id}, '${escapeHtml(data.content).replace(/'/g, "\\'")}')\">\n                    <i class=\"bi bi-pencil\"></i>\n                </button>\n                <button class=\"btn btn-sm btn-outline-danger\" onclick=\"deleteMessage(${data.id})\">\n                    <i class=\"bi bi-trash\"></i>\n                </button>\n                ` : ''}\n            </div>\n        </div>\n        <div class=\"message-content mt-2\">\n            <p class=\"mb-0\" id=\"message-content-${data.id}\">${escapeHtml(data.content).replace(/\n/g, '<br>')}</p>\n            ${data.attachments ? renderAttachments(data.attachments) : ''}\n        </div>\n    `;
     messagesContainer.appendChild(messageDiv);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 };
@@ -662,40 +614,39 @@ function addSystemMessage(message) {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-function switchRoom(roomId, roomName) {
-    // Update active room
-    document.querySelectorAll('.list-group-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    document.querySelector(`[data-room="${roomId}"]`).classList.add('active');
-
-    // Leave current room and join new one
-    socket.emit('leave_room', {room: currentRoom});
-    socket.emit('join_room', {room: roomId});
-
-    currentRoom = roomId;
-    currentDMUser = null;
-    document.getElementById('chat-title').innerHTML = `<i class="bi bi-hash"></i> ${roomName}`;
-
-    // Clear messages and load room messages
-    clearMessages();
-    loadRoomMessages(roomId);
-}
-
+// Patch switchToDM to always update chat area
 function switchToDM(userId, username) {
     console.log('[DM] switchToDM called for userId:', userId, 'username:', username);
-    // Clear active room
+    // Clear active room highlight
     document.querySelectorAll('.list-group-item').forEach(item => {
         item.classList.remove('active');
     });
+    // Highlight the selected DM
+    const dmItem = document.querySelector(`.list-group-item[onclick*="switchToDM('${userId}'"]`);
+    if (dmItem) dmItem.classList.add('active');
     currentDMUser = userId;
     currentRoom = null;
     document.getElementById('chat-title').innerHTML = `<i class="bi bi-person-circle"></i> ${username}`;
-    // Clear messages and load DM
     clearMessages();
     loadDirectMessages(userId);
 }
-window.switchToDM = switchToDM; // Ensure global
+window.switchToDM = switchToDM;
+
+// Patch switchRoom to always update chat area
+function switchRoom(roomId, roomName) {
+    document.querySelectorAll('.list-group-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    const roomItem = document.querySelector(`[data-room="${roomId}"]`);
+    if (roomItem) roomItem.classList.add('active');
+    socket.emit('leave_room', {room: currentRoom});
+    socket.emit('join_room', {room: roomId});
+    currentRoom = roomId;
+    currentDMUser = null;
+    document.getElementById('chat-title').innerHTML = `<i class="bi bi-hash"></i> ${roomName}`;
+    clearMessages();
+    loadRoomMessages(roomId);
+}
 
 function clearMessages() {
     const container = document.getElementById('messages-container');
