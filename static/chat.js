@@ -798,8 +798,6 @@ function deleteRoom(roomId, roomName) {
     }
 }
 
-setAwayAfterInactivity();
-
 // --- Online Users Tooltip ---
 const onlineUsersBadge = document.getElementById('online-users');
 let onlineUsersTooltip = null;
