@@ -491,6 +491,12 @@ socket.on('user_status_update', function(data) {
 // Patch addMessageToChat to show status dot next to username (always use current status)
 window.origAddMessageToChat_status = window.addMessageToChat;
 window.addMessageToChat = function(data) {
+    // Defensive check for missing username
+    if (!data || typeof data !== 'object' || typeof data.username === 'undefined' || typeof data.content === 'undefined') {
+        console.warn('Malformed message received:', data);
+        addSystemMessage('[Malformed message received]');
+        return;
+    }
     // Store the original username for status lookup
     data.raw_username = data.raw_username || data.username;
     const uname = (data.raw_username || data.username).toLowerCase();
