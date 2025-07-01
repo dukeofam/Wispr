@@ -239,7 +239,7 @@ def get_online_count():
 @login_required
 @limiter.limit("60 per minute")
 def get_direct_messages(user_id):
-    """Get direct messages between current user and specified user"""
+    """Get direct messages between current user and specified user. Content is encrypted if is_direct_message is True."""
     messages = ChatMessage.query.filter(
         ChatMessage.is_direct_message == True,
         db.or_(
@@ -247,24 +247,28 @@ def get_direct_messages(user_id):
             db.and_(ChatMessage.user_id == user_id, ChatMessage.recipient_id == session['user_id'])
         )
     ).order_by(ChatMessage.timestamp.asc()).all()
-    
-    return jsonify([{
-        'id': msg.id,
-        'content': msg.content,
-        'username': msg.author.username,
-        'role': msg.author.role,
-        'status': msg.author.status or 'offline',
-        'timestamp': msg.timestamp.isoformat(),
-        'parent_id': msg.parent_id,
-        'parent_username': msg.parent.author.username if msg.parent else None,
-        'parent_content': msg.parent.content[:50] + ('...' if msg.parent and len(msg.parent.content) > 50 else '') if msg.parent else None,
-        'profile_pic': msg.author.profile_pic,
-        'attachments': [{
-            'id': att.id,
-            'original_filename': att.original_filename,
-            'file_size': att.file_size
-        } for att in msg.attachments]
-    } for msg in messages])
+    return jsonify([
+        {
+            'id': msg.id,
+            'content': msg.content,  # Encrypted if is_direct_message
+            'username': msg.author.username,
+            'role': msg.author.role,
+            'status': msg.author.status or 'offline',
+            'timestamp': msg.timestamp.isoformat(),
+            'parent_id': msg.parent_id,
+            'parent_username': msg.parent.author.username if msg.parent else None,
+            'parent_content': msg.parent.content[:50] + ('...' if msg.parent and len(msg.parent.content) > 50 else '') if msg.parent else None,
+            'profile_pic': msg.author.profile_pic,
+            'attachments': [
+                {
+                    'id': att.id,
+                    'original_filename': att.original_filename,
+                    'file_size': att.file_size
+                } for att in msg.attachments
+            ],
+            'is_direct_message': True
+        } for msg in messages
+    ])
 
 
 @app.route('/api/create_room', methods=['POST'])

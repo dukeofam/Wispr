@@ -200,6 +200,20 @@ Or just use `run.sh`/`auto-deploy.sh` for a clean start.
 
 ---
 
+## 🛠️ Migrating from SQLite to PostgreSQL
+
+To migrate your data from SQLite to PostgreSQL, use the provided script:
+
+```bash
+python3 migrate_sqlite_to_postgres.py --sqlite instance/team_collaboration.db --postgres postgresql://user:password@localhost:5432/wispr
+```
+
+- Make sure PostgreSQL is running and the target database exists.
+- The script will copy all tables and data, handling type conversions.
+- See the script for more options and details.
+
+---
+
 ## 📝 License
 
 This project is provided as-is for private team use.  

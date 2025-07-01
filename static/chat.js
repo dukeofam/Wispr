@@ -226,42 +226,118 @@ function cancelReply() {
     messageInput.placeholder = 'Type your message...';
 }
 
-// Update message form submission to handle replies
+// --- DM End-to-End Encryption ---
+// Use a shared key derived from both user IDs (sorted, as string)
+const DM_KEYS = {};
+
+async function getDMKey(otherUserId) {
+    // Deterministically derive a key from both user IDs (sorted)
+    const ids = [window.CHAT_CONTEXT.user_id, otherUserId].map(String).sort().join(":");
+    if (DM_KEYS[ids]) return DM_KEYS[ids];
+    // For demo: use SHA-256 of ids as key material
+    const enc = new TextEncoder();
+    const keyMaterial = await window.crypto.subtle.digest('SHA-256', enc.encode(ids));
+    const key = await window.crypto.subtle.importKey(
+        'raw', keyMaterial, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']
+    );
+    DM_KEYS[ids] = key;
+    return key;
+}
+
+async function encryptDM(plaintext, recipientId) {
+    try {
+        const key = await getDMKey(recipientId);
+        const enc = new TextEncoder();
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        const ciphertext = await window.crypto.subtle.encrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            enc.encode(plaintext)
+        );
+        // Return base64(iv) + ':' + base64(ciphertext)
+        return btoa(String.fromCharCode(...iv)) + ':' + btoa(String.fromCharCode(...new Uint8Array(ciphertext)));
+    } catch (e) {
+        alert('Encryption failed: ' + e);
+        return plaintext;
+    }
+}
+
+async function decryptDM(ciphertext, senderId) {
+    try {
+        const key = await getDMKey(senderId);
+        const [ivB64, ctB64] = ciphertext.split(':');
+        if (!ivB64 || !ctB64) return ciphertext;
+        const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0));
+        const ct = Uint8Array.from(atob(ctB64), c => c.charCodeAt(0));
+        const dec = await window.crypto.subtle.decrypt(
+            { name: 'AES-GCM', iv },
+            key,
+            ct
+        );
+        return new TextDecoder().decode(dec);
+    } catch (e) {
+        console.warn('Decryption failed:', e);
+        return '[Encrypted message: could not decrypt]';
+    }
+}
+
+// Patch message sending to encrypt DMs
 if (document.getElementById('message-form')) {
-    document.getElementById('message-form').addEventListener('submit', function(e) {
+    document.getElementById('message-form').addEventListener('submit', async function(e) {
         e.preventDefault();
         const messageInput = document.getElementById('message-input');
-        const message = messageInput.value.trim();
-
+        let message = messageInput.value.trim();
         if (message) {
+            let encrypted = message;
+            if (currentDMUser) {
+                encrypted = await encryptDM(message, currentDMUser);
+            }
             const data = {
-                message: message,
+                message: encrypted,
                 room: currentDMUser ? null : currentRoom,
                 recipient_id: currentDMUser
             };
-
             // Add parent_id if replying
             if (replyingTo) {
                 data.parent_id = replyingTo.id;
             }
-
             console.log('Sending message:', data);
-            
             if (replyingTo) {
                 socket.emit('reply_message', data);
             } else {
                 socket.emit('send_message', data);
             }
-            
             messageInput.value = '';
             cancelReply();
-
             if (isTyping) {
                 socket.emit('stop_typing', {room: currentRoom});
                 isTyping = false;
             }
         }
     });
+}
+
+// Patch loadDirectMessages to decrypt DMs
+function loadDirectMessages(userId) {
+    console.log('[DM] loadDirectMessages called for userId:', userId);
+    fetch(`/api/direct_messages/${userId}`)
+        .then(response => response.json())
+        .then(async messages => {
+            if (messages.length > 0) {
+                document.getElementById('no-messages').style.display = 'none';
+                const validMessages = messages.filter(message => message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined');
+                const malformed = messages.filter(message => !message || typeof message.username === 'undefined' || typeof message.content === 'undefined');
+                if (malformed.length > 0) {
+                    console.warn('Malformed DM messages in history:', malformed);
+                }
+                for (const message of validMessages) {
+                    if (currentDMUser && message.is_direct_message) {
+                        message.content = await decryptDM(message.content, message.username === window.CHAT_CONTEXT.username ? currentDMUser : message.username);
+                    }
+                    addMessageToChat(message);
+                }
+            }
+        });
 }
 
 // Typing detection
@@ -607,19 +683,19 @@ function switchRoom(roomId, roomName) {
 }
 
 function switchToDM(userId, username) {
+    console.log('[DM] switchToDM called for userId:', userId, 'username:', username);
     // Clear active room
     document.querySelectorAll('.list-group-item').forEach(item => {
         item.classList.remove('active');
     });
-
     currentDMUser = userId;
     currentRoom = null;
     document.getElementById('chat-title').innerHTML = `<i class="bi bi-person-circle"></i> ${username}`;
-
     // Clear messages and load DM
     clearMessages();
     loadDirectMessages(userId);
 }
+window.switchToDM = switchToDM; // Ensure global
 
 function clearMessages() {
     const container = document.getElementById('messages-container');
@@ -636,22 +712,6 @@ function loadRoomMessages(roomId) {
                 const malformed = messages.filter(message => !message || typeof message.username === 'undefined' || typeof message.content === 'undefined');
                 if (malformed.length > 0) {
                     console.warn('Malformed messages in history:', malformed);
-                }
-                validMessages.forEach(message => addMessageToChat(message));
-            }
-        });
-}
-
-function loadDirectMessages(userId) {
-    fetch(`/api/direct_messages/${userId}`)
-        .then(response => response.json())
-        .then(messages => {
-            if (messages.length > 0) {
-                document.getElementById('no-messages').style.display = 'none';
-                const validMessages = messages.filter(message => message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined');
-                const malformed = messages.filter(message => !message || typeof message.username === 'undefined' || typeof message.content === 'undefined');
-                if (malformed.length > 0) {
-                    console.warn('Malformed DM messages in history:', malformed);
                 }
                 validMessages.forEach(message => addMessageToChat(message));
             }
