@@ -33,6 +33,23 @@ def login_required(f):
     return decorated_function
 
 
+def moderator_required(f):
+    """Decorator to require moderator or admin privileges"""
+    from functools import wraps
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        user = User.query.get(session['user_id'])
+        if not user or user.role not in ('admin', 'moderator'):
+            flash('Moderator or admin access required', 'error')
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+
+    return decorated_function
+
+
 def admin_required(f):
     """Decorator to require admin privileges"""
     from functools import wraps
@@ -42,7 +59,7 @@ def admin_required(f):
         if 'user_id' not in session:
             return redirect(url_for('login'))
         user = User.query.get(session['user_id'])
-        if not user or not user.is_admin:
+        if not user or user.role != 'admin':
             flash('Admin access required', 'error')
             return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
@@ -70,7 +87,7 @@ def login():
             session.clear()
             session['user_id'] = user.id
             session['username'] = user.username
-            session['is_admin'] = user.is_admin
+            session['role'] = user.role
             session.permanent = True  # Enable session timeout
             session.modified = True
             flash('Login successful', 'success')
@@ -684,7 +701,9 @@ def create_user():
     username = request.form['username'].strip()
     email = request.form['email'].strip()
     password = request.form['password'].strip()
-    is_admin = 'is_admin' in request.form
+    role = request.form.get('role', 'member')
+    if role not in ('admin', 'moderator', 'member'):
+        role = 'member'
 
     if not username or not email or not password:
         flash('All fields are required', 'error')
@@ -700,7 +719,7 @@ def create_user():
         flash('Username or email already exists', 'error')
         return redirect(url_for('admin'))
 
-    user = User(username=username, email=email, is_admin=is_admin)
+    user = User(username=username, email=email, role=role)
     user.set_password(password)
 
     db.session.add(user)
@@ -717,7 +736,7 @@ def delete_user(user_id):
     user = User.query.get_or_404(user_id)
     # Prevent deleting the default admin account if no other admin exists
     if user.username == 'admin':
-        other_admins = User.query.filter(User.is_admin).count()
+        other_admins = User.query.filter(User.role == 'admin').count()
         if other_admins == 1:  # Only one admin left
             flash('Cannot delete the default admin account unless another admin exists', 'error')
             return redirect(url_for('admin'))
@@ -737,6 +756,24 @@ def delete_user(user_id):
     db.session.commit()
     flash('User deleted successfully', 'success')
     logging.info(f"Admin {session['username']} (id={session['user_id']}) deleted user: {user.username} (id={user.id})")
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/change_role/<int:user_id>', methods=['POST'])
+@admin_required
+def change_user_role(user_id):
+    user = User.query.get_or_404(user_id)
+    new_role = request.form.get('role')
+    if new_role not in ('admin', 'moderator', 'member'):
+        flash('Invalid role', 'error')
+        return redirect(url_for('admin'))
+    # Prevent demoting yourself from admin
+    if user.id == session['user_id'] and user.role == 'admin' and new_role != 'admin':
+        flash('You cannot change your own admin role', 'error')
+        return redirect(url_for('admin'))
+    user.role = new_role
+    db.session.commit()
+    flash('User role updated', 'success')
     return redirect(url_for('admin'))
 
 
@@ -1374,7 +1411,7 @@ def get_projects():
     } for p in projects])
 
 @app.route('/api/projects', methods=['POST'])
-@admin_required
+@moderator_required
 def create_project():
     data = request.get_json()
     name = data.get('name', '').strip()
@@ -1391,7 +1428,7 @@ def create_project():
     return jsonify({'success': True, 'project_id': project.id})
 
 @app.route('/api/projects/<int:project_id>', methods=['PUT'])
-@admin_required
+@moderator_required
 def edit_project(project_id):
     data = request.get_json()
     name = data.get('name', '').strip()
@@ -1404,7 +1441,7 @@ def edit_project(project_id):
     return jsonify({'success': True})
 
 @app.route('/api/projects/<int:project_id>', methods=['DELETE'])
-@admin_required
+@moderator_required
 def delete_project(project_id):
     project = Project.query.get_or_404(project_id)
     db.session.delete(project)

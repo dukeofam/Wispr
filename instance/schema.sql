@@ -6,7 +6,7 @@ CREATE TABLE user (
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    is_admin BOOLEAN DEFAULT 0,
+    role TEXT DEFAULT 'member',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     profile_pic TEXT,
     status TEXT DEFAULT 'online'
@@ -115,4 +115,4 @@ CREATE TABLE message_reaction (
 );
 
 -- Insert a default admin user (password must be set manually)
-INSERT INTO user (username, email, password_hash, is_admin) VALUES ('admin', 'admin@example.com', 'scrypt:32768:8:1$VOfpb9n6NzTO9zTg$65091b0a1558a65f18a25e332a783b7a4e52eef7e1ed861203e95346e4ab16e0e09744c5fd4d271e3345a35969fcb0044fd08b559e1a83d3f3855090965f9c15', 1); 
+INSERT INTO user (username, email, password_hash, role) VALUES ('admin', 'admin@example.com', 'scrypt:32768:8:1$VOfpb9n6NzTO9zTg$65091b0a1558a65f18a25e332a783b7a4e52eef7e1ed861203e95346e4ab16e0e09744c5fd4d271e3345a35969fcb0044fd08b559e1a83d3f3855090965f9c15', 'admin'); 

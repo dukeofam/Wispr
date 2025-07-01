@@ -43,12 +43,12 @@
                         </div>
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <div class="form-check mt-4">
-                                    <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin">
-                                    <label class="form-check-label" for="is_admin">
-                                        Admin Privileges
-                                    </label>
-                                </div>
+                                <label for="role" class="form-label">Role *</label>
+                                <select class="form-select" id="role" name="role" required>
+                                    <option value="member" selected>Member</option>
+                                    <option value="moderator">Moderator</option>
+                                    <option value="admin">Admin</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -92,8 +92,10 @@
                                 </td>
                                 <td>{{ user.email }}</td>
                                 <td>
-                                    {% if user.is_admin %}
+                                    {% if user.role == 'admin' %}
                                         <span class="badge bg-danger">Admin</span>
+                                    {% elif user.role == 'moderator' %}
+                                        <span class="badge bg-warning text-dark">Moderator</span>
                                     {% else %}
                                         <span class="badge bg-secondary">Member</span>
                                     {% endif %}
@@ -101,6 +103,14 @@
                                 <td>{{ user.created_at.strftime('%Y-%m-%d') }}</td>
                                 <td>
                                     {% if user.id != current_user.id %}
+                                    <form action="{{ url_for('change_user_role', user_id=user.id) }}" method="POST" style="display: inline;">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <select name="role" class="form-select form-select-sm d-inline w-auto align-middle" style="min-width: 110px; display: inline-block;" onchange="this.form.submit()">
+                                            <option value="member" {% if user.role == 'member' %}selected{% endif %}>Member</option>
+                                            <option value="moderator" {% if user.role == 'moderator' %}selected{% endif %}>Moderator</option>
+                                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                                        </select>
+                                    </form>
                                     <form action="{{ url_for('delete_user', user_id=user.id) }}" method="POST" style="display: inline;">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                         <button type="submit" class="btn btn-sm btn-outline-danger"
@@ -109,7 +119,7 @@
                                         </button>
                                     </form>
                                     {% else %}
-                                    <span class="text-muted">Cannot delete yourself</span>
+                                    <span class="text-muted">Cannot delete or change your own role</span>
                                     {% endif %}
                                 </td>
                             </tr>
@@ -142,8 +152,9 @@
                         <h6>Database Statistics</h6>
                         <ul class="list-unstyled">
                             <li><strong>Total Users:</strong> {{ users|length }}</li>
-                            <li><strong>Admin Users:</strong> {{ users|selectattr('is_admin')|list|length }}</li>
-                            <li><strong>Regular Members:</strong> {{ users|rejectattr('is_admin')|list|length }}</li>
+                            <li><strong>Admin Users:</strong> {{ users|selectattr('role', 'eq', 'admin')|list|length }}</li>
+                            <li><strong>Moderator Users:</strong> {{ users|selectattr('role', 'eq', 'moderator')|list|length }}</li>
+                            <li><strong>Regular Members:</strong> {{ users|rejectattr('role', 'in', ['admin', 'moderator'])|list|length }}</li>
                         </ul>
                     </div>
                     <div class="col-md-6">
