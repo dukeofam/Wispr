@@ -95,6 +95,13 @@ if [ -f instance/team_collaboration.db ]; then
     echo "Removing old database (with sudo)..."
     sudo rm -f instance/team_collaboration.db
 fi
+# --- Initialize new SQLite database from schema.sql if using SQLite
+if grep -q 'sqlite' /var/www/wispr/.env; then
+    if [ -f instance/schema.sql ]; then
+        echo "Initializing new SQLite database from schema.sql..."
+        sudo -u wispr sqlite3 /var/www/wispr/instance/team_collaboration.db < /var/www/wispr/instance/schema.sql
+    fi
+fi
 
 # --- Write temporary HTTP-only Nginx config ---
 echo "[+] Writing temporary HTTP-only Nginx config..."
