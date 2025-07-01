@@ -632,13 +632,12 @@ function loadRoomMessages(roomId) {
         .then(messages => {
             if (messages.length > 0) {
                 document.getElementById('no-messages').style.display = 'none';
-                messages.forEach(message => {
-                    if (message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined') {
-                        addMessageToChat(message);
-                    } else {
-                        console.warn('Malformed message in history:', message);
-                    }
-                });
+                const validMessages = messages.filter(message => message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined');
+                const malformed = messages.filter(message => !message || typeof message.username === 'undefined' || typeof message.content === 'undefined');
+                if (malformed.length > 0) {
+                    console.warn('Malformed messages in history:', malformed);
+                }
+                validMessages.forEach(message => addMessageToChat(message));
             }
         });
 }
@@ -649,13 +648,12 @@ function loadDirectMessages(userId) {
         .then(messages => {
             if (messages.length > 0) {
                 document.getElementById('no-messages').style.display = 'none';
-                messages.forEach(message => {
-                    if (message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined') {
-                        addMessageToChat(message);
-                    } else {
-                        console.warn('Malformed DM message in history:', message);
-                    }
-                });
+                const validMessages = messages.filter(message => message && typeof message.username !== 'undefined' && typeof message.content !== 'undefined');
+                const malformed = messages.filter(message => !message || typeof message.username === 'undefined' || typeof message.content === 'undefined');
+                if (malformed.length > 0) {
+                    console.warn('Malformed DM messages in history:', malformed);
+                }
+                validMessages.forEach(message => addMessageToChat(message));
             }
         });
 }
