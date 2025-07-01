@@ -176,7 +176,7 @@ def get_messages():
         'id': msg.id,
         'content': msg.content,
         'username': msg.author.username,
-        'is_admin': msg.author.is_admin,
+        'is_admin': msg.author.role == 'admin',
         'status': msg.author.status or 'offline',
         'timestamp': msg.timestamp.isoformat(),
         'profile_pic': msg.author.profile_pic,
@@ -213,7 +213,7 @@ def get_room_messages(room_id):
         'id': msg.id,
         'content': msg.content,
         'username': msg.author.username,
-        'is_admin': msg.author.is_admin,
+        'is_admin': msg.author.role == 'admin',
         'status': msg.author.status or 'offline',
         'timestamp': msg.timestamp.isoformat(),
         'parent_id': msg.parent_id,
@@ -252,7 +252,7 @@ def get_direct_messages(user_id):
         'id': msg.id,
         'content': msg.content,
         'username': msg.author.username,
-        'is_admin': msg.author.is_admin,
+        'is_admin': msg.author.role == 'admin',
         'status': msg.author.status or 'offline',
         'timestamp': msg.timestamp.isoformat(),
         'parent_id': msg.parent_id,
@@ -446,7 +446,7 @@ def delete_message(message_id):
     message = ChatMessage.query.get_or_404(message_id)
     
     # Check if user is the author or admin
-    if message.user_id != session['user_id'] and not session.get('is_admin', False):
+    if message.user_id != session['user_id'] and session.get('role') != 'admin':
         return jsonify({'success': False, 'error': 'You can only delete your own messages'})
     
     # Delete message attachments first
@@ -559,7 +559,7 @@ def update_task_status(task_id, status):
 def delete_task(task_id):
     task = Task.query.get_or_404(task_id)
     # Only allow task creator or admin to delete
-    if task.user_id == session['user_id'] or session.get('is_admin', False):
+    if task.user_id == session['user_id'] or session.get('role') == 'admin':
         db.session.delete(task)
         db.session.commit()
         flash('Task deleted', 'success')
@@ -934,7 +934,7 @@ def handle_message(data):
             'id': message.id,
             'content': message.content,
             'username': user.username,
-            'is_admin': user.is_admin,
+            'is_admin': user.role == 'admin',
             'status': user.status or 'offline',
             'timestamp': message.timestamp.isoformat(),
             'profile_pic': user.profile_pic,
@@ -991,7 +991,7 @@ def handle_message(data):
         'id': message.id,
         'content': message.content,
         'username': user.username,
-        'is_admin': user.is_admin,
+        'is_admin': user.role == 'admin',
         'status': user.status or 'offline',
         'timestamp': message.timestamp.isoformat(),
         'profile_pic': user.profile_pic,
@@ -1224,7 +1224,7 @@ def handle_reply_message(data):
             'id': message.id,
             'content': message.content,
             'username': user.username,
-            'is_admin': user.is_admin,
+            'is_admin': user.role == 'admin',
             'status': user.status or 'offline',
             'timestamp': message.timestamp.isoformat(),
             'profile_pic': user.profile_pic,
@@ -1278,7 +1278,7 @@ def handle_reply_message(data):
         'id': message.id,
         'content': message.content,
         'username': user.username,
-        'is_admin': user.is_admin,
+        'is_admin': user.role == 'admin',
         'status': user.status or 'offline',
         'timestamp': message.timestamp.isoformat(),
         'profile_pic': user.profile_pic,

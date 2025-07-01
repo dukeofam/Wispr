@@ -11,8 +11,6 @@ class User(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     profile_pic = db.Column(db.String(255), nullable=True)  # Filename of profile picture
     status = db.Column(db.String(16), default='online')  # online, away, dnd, offline
-    # (keep is_admin for migration compatibility, but mark as deprecated)
-    is_admin = db.Column(db.Boolean, default=False)  # Deprecated: use role
 
     # Relationships
     messages = db.relationship('ChatMessage', foreign_keys='ChatMessage.user_id', backref='author', lazy='dynamic', overlaps="sent_messages")

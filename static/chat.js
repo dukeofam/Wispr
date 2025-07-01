@@ -1,7 +1,7 @@
 // Chat logic for Wispr
 
 // The following variables must be set in the template before loading this script:
-// window.CHAT_CONTEXT = { username: '...', is_admin: true/false };
+// window.CHAT_CONTEXT = { username: '...', role: 'admin'|'moderator'|'member' };
 
 // Initialize Socket.IO
 const socket = io();

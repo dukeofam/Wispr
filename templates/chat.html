@@ -17,7 +17,7 @@
                         <a href="#" class="flex-grow-1 text-decoration-none text-reset" onclick="switchRoom('{{ 'general' if room.name == 'General Chat' else room.id }}', '{{ room.name }}')">
                             <i class="bi bi-hash"></i> {{ room.name }}
                         </a>
-                        {% if current_user.is_admin and room.name != 'General Chat' %}
+                        {% if current_user.role == 'admin' and room.name != 'General Chat' %}
                         <button class="btn btn-sm btn-outline-danger ms-2" onclick="deleteRoom({{ room.id }}, '{{ room.name }}')" title="Delete room">
                             <i class="bi bi-trash"></i>
                         </button>
@@ -25,7 +25,7 @@
                     </div>
                     {% endfor %}
                 </div>
-                {% if current_user.is_admin %}
+                {% if current_user.role == 'admin' %}
                 <hr>
                 <button class="btn btn-outline-primary btn-sm w-100 mb-2" data-bs-toggle="modal" data-bs-target="#createRoomModal">
                     <i class="bi bi-plus"></i> Create Room
@@ -48,7 +48,7 @@
                     {% if user.id != current_user.id %}
                     <a href="#" class="list-group-item list-group-item-action" onclick="switchToDM('{{ user.id }}', '{{ user.username }}')">
                         <i class="bi bi-person-circle"></i> {{ user.username }}
-                        {% if user.is_admin %}<span class="badge bg-danger ms-1">Admin</span>{% endif %}
+                        {% if user.role == 'admin' %}<span class="badge bg-danger ms-1">Admin</span>{% endif %}
                     </a>
                     {% endif %}
                     {% endfor %}
@@ -149,7 +149,7 @@
 window.CHAT_CONTEXT = {
     username: '{{ current_user.username }}',
     user_id: {{ current_user.id }},
-    is_admin: {{ 'true' if current_user.is_admin else 'false' }}
+    role: '{{ current_user.role }}'
 };
 </script>
 <script src="{{ url_for('static', filename='chat.js') }}"></script>

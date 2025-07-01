@@ -97,11 +97,11 @@ with app.app_context():
             username='admin',
             email='admin@company.com',
             password_hash=generate_password_hash('admin123'),
-            is_admin=True
+            role='admin'
         )
         db.session.add(admin_user)
         db.session.commit()
-        logging.info("Created default admin user (username: admin, password: admin123)")
+        logging.info("Created default admin user (username: admin, password: admin123, role: admin)")
 
 # Import routes
 import routes
