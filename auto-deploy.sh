@@ -53,6 +53,11 @@ echo "[+] Copying current repo to /var/www/wispr..."
 sudo rsync -a --delete ./ /var/www/wispr/
 sudo chown -R wispr:wispr /var/www/wispr
 
+# --- Remove old virtual environment if it exists
+if [ -d /var/www/wispr/wispr_env ]; then
+    echo "Removing old virtual environment..."
+    sudo rm -rf /var/www/wispr/wispr_env
+fi
 # --- Set up Python virtual environment as wispr user ---
 echo "[+] Setting up Python virtual environment..."
 cd /var/www/wispr
@@ -91,9 +96,9 @@ sudo touch /var/log/wispr/wispr.log
 sudo chown -R wispr:wispr /var/log/wispr
 
 # --- Remove old database for a clean deploy
-if [ -f instance/team_collaboration.db ]; then
-    echo "Removing old database (with sudo)..."
-    sudo rm -f instance/team_collaboration.db
+if [ -f /var/www/wispr/instance/team_collaboration.db ]; then
+    echo "Removing old database in deployment directory (with sudo)..."
+    sudo rm -f /var/www/wispr/instance/team_collaboration.db
 fi
 # --- Initialize new SQLite database from schema.sql if using SQLite
 if grep -q 'sqlite' /var/www/wispr/.env; then
