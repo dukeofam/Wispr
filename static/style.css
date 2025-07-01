@@ -131,3 +131,166 @@
 #messages-container::-webkit-scrollbar-thumb:hover {
     background: var(--bs-gray-500);
 }
+
+/* Emoji Reaction Styles */
+.reaction-bar {
+    position: relative;
+}
+
+.emoji-menu-container {
+    position: relative;
+}
+
+.emoji-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    min-width: 200px;
+    margin-top: 0.25rem;
+}
+
+.emoji-option {
+    transition: all 0.2s ease;
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 1.1rem;
+}
+
+.emoji-option:hover {
+    background-color: #e9ecef;
+    transform: scale(1.1);
+}
+
+.reaction-btn {
+    transition: all 0.2s ease;
+    border-radius: 0.375rem;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.9rem;
+}
+
+.reaction-btn:hover {
+    transform: scale(1.05);
+}
+
+.reaction-btn.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.reaction-count {
+    font-size: 0.8rem;
+    font-weight: 500;
+    margin-left: 0.25rem;
+}
+
+.emoji-toggle {
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.emoji-toggle:hover {
+    background-color: #e9ecef;
+    transform: scale(1.1);
+}
+
+/* Dark theme support */
+[data-bs-theme="dark"] .emoji-menu {
+    background: #2d3748;
+    border-color: #4a5568;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .emoji-option:hover {
+    background-color: #4a5568;
+}
+
+[data-bs-theme="dark"] .emoji-toggle:hover {
+    background-color: #4a5568;
+}
+
+/* Message Threading Styles */
+.message-item[style*="margin-left"] {
+    position: relative;
+}
+
+.reply-preview {
+    background-color: #f8f9fa !important;
+    border: 1px solid #e9ecef;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.reply-preview small {
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.reply-preview .text-truncate {
+    color: #495057;
+    font-style: italic;
+}
+
+#reply-indicator {
+    background-color: #e3f2fd !important;
+    border: 1px solid #bbdefb;
+    border-radius: 0.375rem;
+    font-size: 0.875rem;
+}
+
+#reply-indicator .text-truncate {
+    color: #1976d2;
+    font-style: italic;
+    max-width: 300px;
+}
+
+/* Thread visual indicators */
+.message-item[style*="border-left: 3px solid #007bff"] {
+    position: relative;
+}
+
+.message-item[style*="border-left: 3px solid #007bff"]::before {
+    content: '';
+    position: absolute;
+    left: -20px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #007bff, transparent);
+}
+
+/* Dark theme support for threading */
+[data-bs-theme="dark"] .reply-preview {
+    background-color: #2d3748 !important;
+    border-color: #4a5568;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] .reply-preview small {
+    color: #a0aec0;
+}
+
+[data-bs-theme="dark"] .reply-preview .text-truncate {
+    color: #cbd5e0;
+}
+
+[data-bs-theme="dark"] #reply-indicator {
+    background-color: #1a365d !important;
+    border-color: #2c5282;
+    color: #e2e8f0;
+}
+
+[data-bs-theme="dark"] #reply-indicator .text-truncate {
+    color: #63b3ed;
+}

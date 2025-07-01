@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Profile Settings{% endblock %}
+
+{% block content %}
+<div class="container mt-4" style="max-width: 600px;">
+    <h2 class="mb-4">Profile Settings</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    <div class="card mb-4">
+        <div class="card-body text-center">
+            <h5 class="mb-3">Profile Picture</h5>
+            <img src="{{ url_for('profile_pic', filename=user.profile_pic) if user.profile_pic else url_for('static', filename='default_avatar.png') }}" class="rounded-circle mb-3" style="width: 128px; height: 128px; object-fit: cover; border: 2px solid #dee2e6;">
+            <form method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <input class="form-control" type="file" name="profile_pic" accept="image/png, image/jpeg">
+                </div>
+                <button type="submit" class="btn btn-primary">Upload New Picture</button>
+                <div class="form-text">PNG or JPG, max 1MB, will be cropped to 256x256</div>
+            </form>
+        </div>
+    </div>
+    <div class="card">
+        <div class="card-body">
+            <h5 class="mb-3">Change Password</h5>
+            <form method="post">
+                <div class="mb-3">
+                    <label for="old_password" class="form-label">Old Password</label>
+                    <input type="password" class="form-control" id="old_password" name="old_password" required>
+                </div>
+                <div class="mb-3">
+                    <label for="new_password" class="form-label">New Password</label>
+                    <input type="password" class="form-control" id="new_password" name="new_password" required minlength="8">
+                </div>
+                <div class="mb-3">
+                    <label for="confirm_password" class="form-label">Confirm New Password</label>
+                    <input type="password" class="form-control" id="confirm_password" name="confirm_password" required minlength="8">
+                </div>
+                <button type="submit" class="btn btn-success">Change Password</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %} 

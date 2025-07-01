@@ -90,6 +90,12 @@ sudo mkdir -p /var/log/wispr
 sudo touch /var/log/wispr/wispr.log
 sudo chown -R wispr:wispr /var/log/wispr
 
+# --- Remove old database for a clean deploy
+if [ -f instance/team_collaboration.db ]; then
+    echo "Removing old database..."
+    rm instance/team_collaboration.db
+fi
+
 # --- Write temporary HTTP-only Nginx config ---
 echo "[+] Writing temporary HTTP-only Nginx config..."
 sudo bash -c "cat > /etc/nginx/sites-available/wispr" <<EOF

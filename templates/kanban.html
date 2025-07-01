@@ -3,6 +3,48 @@
 {% block title %}Kanban Board - Team Collaboration{% endblock %}
 
 {% block content %}
+<style>
+.project-badge, .all-projects-badge {
+    font-size: 1.15rem;
+    font-weight: 700;
+    padding: 0.5em 1.1em;
+    border-radius: 0.5em;
+    background: transparent;
+    color: #7c5cff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 140px;
+    height: 56px;
+    margin-right: 1em;
+    cursor: pointer;
+    border: 2px solid #7c5cff;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+    box-sizing: border-box;
+    text-align: center;
+}
+.project-badge:last-child, .all-projects-badge:last-child {
+    margin-right: 0;
+}
+.project-badge.active, .all-projects-badge.active {
+    background: #7c5cff;
+    color: #fff;
+    border-color: #7c5cff;
+    box-shadow: 0 2px 12px 0 rgba(124,92,255,0.10);
+}
+.project-badge:hover:not(.active), .all-projects-badge:hover:not(.active) {
+    background: #edeaff;
+    color: #5a3fc0;
+}
+.projects-badges-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1em;
+    margin-top: 1.2em;
+    margin-bottom: 0.5em;
+}
+</style>
+
 <div class="row">
     <div class="col-12">
         <h1><i class="bi bi-kanban"></i> Kanban Board</h1>
@@ -10,24 +52,28 @@
     </div>
 </div>
 
-<!-- Project Templates -->
+<!-- Projects List -->
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                <h5><i class="bi bi-file-earmark-code"></i> Project Templates</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="bi bi-folder"></i> Projects</h5>
+                {% if current_user.is_admin %}
+                <button class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#createProjectModal">
+                    <i class="bi bi-plus"></i> Create Project
+                </button>
+                {% endif %}
             </div>
             <div class="card-body">
-                {% if templates %}
-                <div class="d-flex flex-wrap gap-2">
-                    {% for template in templates %}
-                    <button class="btn btn-outline-primary btn-sm" onclick="applyTemplate({{ template.id }})">
-                        <i class="bi bi-lightning"></i> {{ template.name }}
-                    </button>
+                {% if projects %}
+                <div class="projects-badges-row">
+                    <span class="all-projects-badge" id="all-projects-badge">All Projects</span>
+                    {% for project in projects %}
+                    <span class="badge project-badge" onclick="filterByProject({{ project.id }})" id="project-badge-{{ project.id }}">{{ project.name }}</span>
                     {% endfor %}
                 </div>
                 {% else %}
-                <p class="text-muted mb-0">No project templates available. Create one in the admin panel.</p>
+                <p class="text-muted mb-0">No projects available.{% if current_user.is_admin %} Create one using the button above.{% else %} Contact an admin to create one.{% endif %}</p>
                 {% endif %}
             </div>
         </div>
@@ -81,6 +127,19 @@
                             </div>
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="project_id" class="form-label">Project *</label>
+                                <select class="form-select" id="project_id" name="project_id" required>
+                                    <option value="" disabled selected>Select a project</option>
+                                    {% for project in projects %}
+                                    <option value="{{ project.id }}">{{ project.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <div class="mb-3">
                         <label for="description" class="form-label">Description</label>
                         <textarea class="form-control" id="description" name="description" rows="3"></textarea>
@@ -108,6 +167,7 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="card-title mb-1">{{ task.title }}</h6>
+                            <span class="badge bg-primary project-badge-on-task" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
                             <div class="dropdown">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                     <i class="bi bi-three-dots"></i>
@@ -179,6 +239,7 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="card-title mb-1">{{ task.title }}</h6>
+                            <span class="badge bg-primary project-badge-on-task" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
                             <div class="dropdown">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                     <i class="bi bi-three-dots"></i>
@@ -250,6 +311,7 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between align-items-start mb-2">
                             <h6 class="card-title mb-1">{{ task.title }}</h6>
+                            <span class="badge bg-primary project-badge-on-task" data-project-id="{{ task.project.id }}" style="display:none">{{ task.project.name }}</span>
                             <div class="dropdown">
                                 <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                                     <i class="bi bi-three-dots"></i>
@@ -329,7 +391,62 @@
     </div>
 </div>
 
+<!-- Create Project Modal -->
+{% if current_user.is_admin %}
+<div class="modal fade" id="createProjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Create Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="create-project-form">
+                    <div class="mb-3">
+                        <label for="project-name" class="form-label">Project Name</label>
+                        <input type="text" class="form-control" id="project-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="project-description" class="form-label">Description</label>
+                        <textarea class="form-control" id="project-description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-success">Create</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Project Modal -->
+<div class="modal fade" id="editProjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Edit Project</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="edit-project-form">
+                    <input type="hidden" id="edit-project-id">
+                    <div class="mb-3">
+                        <label for="edit-project-name" class="form-label">Project Name</label>
+                        <input type="text" class="form-control" id="edit-project-name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit-project-description" class="form-label">Description</label>
+                        <textarea class="form-control" id="edit-project-description" rows="3"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <script>
+window.CSRF_TOKEN = "{{ csrf_token() }}";
+
 function openTaskModal(taskId) {
     const modal = new bootstrap.Modal(document.getElementById('taskModal'));
     document.getElementById('taskModalBody').innerHTML = `
@@ -456,20 +573,133 @@ function addComment(taskId) {
     });
 }
 
-function applyTemplate(templateId) {
-    if (confirm('This will create multiple tasks from the template. Continue?')) {
-        fetch(`/api/template/${templateId}/apply`, {
-            method: 'POST'
+// --- Project Template Management (Admin) ---
+function showToast(msg, type='success') {
+    let toast = document.createElement('div');
+    toast.className = 'wispr-toast';
+    toast.style.position = 'fixed';
+    toast.style.bottom = '32px';
+    toast.style.right = '32px';
+    toast.style.background = type === 'success' ? '#28a745' : '#dc3545';
+    toast.style.color = '#fff';
+    toast.style.padding = '16px 24px';
+    toast.style.borderRadius = '8px';
+    toast.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+    toast.style.fontSize = '1rem';
+    toast.style.zIndex = 9999;
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3000);
+}
+
+// CREATE
+const createForm = document.getElementById('create-project-form');
+if (createForm) {
+    createForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const name = document.getElementById('project-name').value.trim();
+        const description = document.getElementById('project-description').value.trim();
+        fetch('/api/projects', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.CSRF_TOKEN
+            },
+            body: JSON.stringify({name, description})
         })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Project created!');
                 location.reload();
             } else {
-                alert('Error applying template: ' + result.error);
+                showToast(data.error || 'Error creating project', 'error');
             }
-        });
-    }
+        })
+        .catch(() => showToast('Error creating project', 'error'));
+    });
 }
+
+// DELETE
+window.deleteProject = function(projectId) {
+    if (!confirm('Are you sure you want to delete this project?')) return;
+    fetch(`/api/projects/${projectId}`, {
+        method: 'DELETE',
+        headers: {'X-CSRFToken': window.CSRF_TOKEN}
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Project deleted!');
+            location.reload();
+        } else {
+            showToast(data.error || 'Error deleting project', 'error');
+        }
+    })
+    .catch(() => showToast('Error deleting project', 'error'));
+}
+
+// EDIT
+window.openEditProjectModal = function(id, name, description) {
+    document.getElementById('edit-project-id').value = id;
+    document.getElementById('edit-project-name').value = name;
+    document.getElementById('edit-project-description').value = description;
+    new bootstrap.Modal(document.getElementById('editProjectModal')).show();
+}
+const editForm = document.getElementById('edit-project-form');
+if (editForm) {
+    editForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const id = document.getElementById('edit-project-id').value;
+        const name = document.getElementById('edit-project-name').value.trim();
+        const description = document.getElementById('edit-project-description').value.trim();
+        fetch(`/api/projects/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': window.CSRF_TOKEN
+            },
+            body: JSON.stringify({name, description})
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Project updated!');
+                location.reload();
+            } else {
+                showToast(data.error || 'Error updating project', 'error');
+            }
+        })
+        .catch(() => showToast('Error updating project', 'error'));
+    });
+}
+
+function clearAllProjectHighlights() {
+    document.querySelectorAll('.project-badge, .all-projects-badge').forEach(b => b.classList.remove('active'));
+}
+function filterByProject(projectId) {
+    clearAllProjectHighlights();
+    const badge = document.getElementById('project-badge-' + projectId);
+    if (badge) badge.classList.add('active');
+    document.querySelectorAll('.task-card').forEach(card => {
+        const taskProjectId = card.querySelector('.badge.project-badge-on-task')?.dataset.projectId;
+        if (String(taskProjectId) === String(projectId)) {
+            card.style.display = '';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+document.getElementById('all-projects-badge').onclick = function() {
+    clearAllProjectHighlights();
+    this.classList.add('active');
+    document.querySelectorAll('.task-card').forEach(card => {
+        card.style.display = '';
+    });
+};
+window.addEventListener('DOMContentLoaded', function() {
+    clearAllProjectHighlights();
+    document.getElementById('all-projects-badge').classList.add('active');
+});
 </script>
 {% endblock %}

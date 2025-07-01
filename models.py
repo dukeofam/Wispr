@@ -9,6 +9,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     is_admin = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    profile_pic = db.Column(db.String(255), nullable=True)  # Filename of profile picture
+    status = db.Column(db.String(16), default='online')  # online, away, dnd, offline
 
     # Relationships
     messages = db.relationship('ChatMessage', foreign_keys='ChatMessage.user_id', backref='author', lazy='dynamic', overlaps="sent_messages")
@@ -51,9 +53,12 @@ class ChatMessage(db.Model):
     room_id = db.Column(db.Integer, db.ForeignKey('chat_room.id'), nullable=True)
     recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     is_direct_message = db.Column(db.Boolean, default=False)
+    parent_id = db.Column(db.Integer, db.ForeignKey('chat_message.id'), nullable=True)
 
     # Relationships
     attachments = db.relationship('MessageAttachment', backref='message', lazy='dynamic', cascade='all, delete-orphan')
+    reactions = db.relationship('MessageReaction', backref='message', lazy='dynamic', cascade='all, delete-orphan')
+    replies = db.relationship('ChatMessage', backref=db.backref('parent', remote_side=[id]), lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):
         return f'<ChatMessage {self.content[:50]}...>'
@@ -72,19 +77,19 @@ class MessageAttachment(db.Model):
         return f'<MessageAttachment {self.original_filename}>'
 
 
-class ProjectTemplate(db.Model):
+class Project(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.Text)
-    template_data = db.Column(db.Text)  # JSON string containing task templates
     created_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
+
     # Relationships
-    creator = db.relationship('User', backref='project_templates')
-    
+    creator = db.relationship('User', backref='projects')
+    tasks = db.relationship('Task', backref='project', lazy='dynamic', cascade='all, delete-orphan')
+
     def __repr__(self):
-        return f'<ProjectTemplate {self.name}>'
+        return f'<Project {self.name}>'
 
 
 class Task(db.Model):
@@ -98,6 +103,7 @@ class Task(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('project.id'), nullable=False)
 
     # Relationships
     assignee = db.relationship('User', foreign_keys=[assigned_to], overlaps="assigned_tasks")
@@ -135,3 +141,19 @@ class TaskActivityLog(db.Model):
     
     def __repr__(self):
         return f'<TaskActivityLog {self.action}>'
+
+
+class MessageReaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    message_id = db.Column(db.Integer, db.ForeignKey('chat_message.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    emoji = db.Column(db.String(16), nullable=False)  # e.g., '👍', '😂', etc.
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = db.relationship('User', backref='message_reactions')
+
+    __table_args__ = (db.UniqueConstraint('message_id', 'user_id', 'emoji', name='unique_reaction_per_user'),)
+
+    def __repr__(self):
+        return f'<MessageReaction {self.emoji} by {self.user_id} on {self.message_id}>'

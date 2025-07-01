@@ -85,6 +85,11 @@
         <!-- Message Input -->
         <div class="card">
             <div class="card-body">
+                <!-- Reply Indicator -->
+                <div id="reply-indicator" class="mb-3 p-2 bg-light rounded" style="display: none; border-left: 3px solid #007bff;">
+                    <!-- Reply content will be inserted here -->
+                </div>
+                
                 <form id="message-form" enctype="multipart/form-data">
                     <div class="input-group">
                         <input type="file" id="file-input" multiple style="display: none;" accept="*/*">
@@ -143,6 +148,7 @@
 <script>
 window.CHAT_CONTEXT = {
     username: '{{ current_user.username }}',
+    user_id: {{ current_user.id }},
     is_admin: {{ 'true' if current_user.is_admin else 'false' }}
 };
 </script>

@@ -1,14 +1,23 @@
-from flask import render_template, request, redirect, url_for, session, flash, jsonify, Response
+from flask import render_template, request, redirect, url_for, session, flash, jsonify, Response, send_from_directory
 from flask_socketio import emit, join_room, leave_room
 from app import app, db, socketio, limiter
-from models import User, ChatMessage, Task, ChatRoom, MessageAttachment, TaskActivityLog
+from models import User, ChatMessage, Task, ChatRoom, MessageAttachment, TaskActivityLog, MessageReaction, Project
 from werkzeug.security import generate_password_hash
 from datetime import datetime
 from sqlalchemy import desc
 import logging
+import re
+from werkzeug.utils import secure_filename
+from PIL import Image
+import os
 
 # Store online users
 online_users = set()
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
+PROFILE_PIC_FOLDER = os.path.join('static', 'profile_pics')
+MAX_PROFILE_PIC_SIZE = 1 * 1024 * 1024  # 1MB
+PROFILE_PIC_DIM = 256
 
 
 def login_required(f):
@@ -151,7 +160,14 @@ def get_messages():
         'content': msg.content,
         'username': msg.author.username,
         'is_admin': msg.author.is_admin,
-        'timestamp': msg.timestamp.isoformat()
+        'status': msg.author.status or 'offline',
+        'timestamp': msg.timestamp.isoformat(),
+        'profile_pic': msg.author.profile_pic,
+        'attachments': [{
+            'id': att.id,
+            'original_filename': att.original_filename,
+            'file_size': att.file_size
+        } for att in msg.attachments]
     } for msg in messages])
 
 
@@ -181,7 +197,12 @@ def get_room_messages(room_id):
         'content': msg.content,
         'username': msg.author.username,
         'is_admin': msg.author.is_admin,
+        'status': msg.author.status or 'offline',
         'timestamp': msg.timestamp.isoformat(),
+        'parent_id': msg.parent_id,
+        'parent_username': msg.parent.author.username if msg.parent else None,
+        'parent_content': msg.parent.content[:50] + ('...' if msg.parent and len(msg.parent.content) > 50 else '') if msg.parent else None,
+        'profile_pic': msg.author.profile_pic,
         'attachments': [{
             'id': att.id,
             'original_filename': att.original_filename,
@@ -215,7 +236,12 @@ def get_direct_messages(user_id):
         'content': msg.content,
         'username': msg.author.username,
         'is_admin': msg.author.is_admin,
+        'status': msg.author.status or 'offline',
         'timestamp': msg.timestamp.isoformat(),
+        'parent_id': msg.parent_id,
+        'parent_username': msg.parent.author.username if msg.parent else None,
+        'parent_content': msg.parent.content[:50] + ('...' if msg.parent and len(msg.parent.content) > 50 else '') if msg.parent else None,
+        'profile_pic': msg.author.profile_pic,
         'attachments': [{
             'id': att.id,
             'original_filename': att.original_filename,
@@ -427,6 +453,7 @@ def kanban():
         priority = request.form.get('priority', 'medium')
         assigned_to = request.form.get('assigned_to') or None
         due_date_str = request.form.get('due_date')
+        project_id = request.form.get('project_id')
         
         due_date = None
         if due_date_str:
@@ -435,13 +462,18 @@ def kanban():
             except ValueError:
                 pass
 
+        if not project_id:
+            flash('Project is required for each task.', 'error')
+            return redirect(url_for('kanban'))
+
         if title:
             task = Task(title=title,
                         description=description,
                         priority=priority,
                         assigned_to=assigned_to,
                         due_date=due_date,
-                        user_id=session['user_id'])
+                        user_id=session['user_id'],
+                        project_id=project_id)
             db.session.add(task)
             db.session.commit()
             
@@ -460,27 +492,23 @@ def kanban():
             flash('Task created successfully', 'success')
         return redirect(url_for('kanban'))
 
-    # Get tasks organized by status
-    todo_tasks = Task.query.filter_by(status='todo').order_by(
-        Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
-    in_progress_tasks = Task.query.filter_by(status='in_progress').order_by(
-        Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
-    done_tasks = Task.query.filter_by(status='done').order_by(
-        Task.updated_at.desc()).all()
-    
     # Get all users for assignment dropdown
     users = User.query.all()
-    
-    # Get project templates
-    from models import ProjectTemplate
-    templates = ProjectTemplate.query.all()
+
+    # Get all projects
+    projects = Project.query.order_by(Project.created_at.desc()).all()
+
+    # Query tasks with joined project for display
+    todo_tasks = Task.query.filter_by(status='todo').order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
+    in_progress_tasks = Task.query.filter_by(status='in_progress').order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
+    done_tasks = Task.query.filter_by(status='done').order_by(Task.updated_at.desc()).all()
 
     return render_template('kanban.html',
                            todo_tasks=todo_tasks,
                            in_progress_tasks=in_progress_tasks,
                            done_tasks=done_tasks,
                            users=users,
-                           templates=templates,
+                           projects=projects,
                            now=datetime.utcnow())
 
 
@@ -640,72 +668,6 @@ def assign_task(task_id):
     db.session.commit()
     
     return jsonify({'success': True})
-
-
-@app.route('/api/project_template', methods=['POST'])
-@admin_required
-def create_project_template():
-    """Create a new project template"""
-    data = request.get_json()
-    name = data.get('name', '').strip()
-    description = data.get('description', '').strip()
-    template_data = data.get('template_data', '[]')
-    
-    if not name:
-        return jsonify({'success': False, 'error': 'Template name is required'})
-    
-    from models import ProjectTemplate
-    template = ProjectTemplate(
-        name=name,
-        description=description,
-        template_data=template_data,
-        created_by=session['user_id']
-    )
-    
-    db.session.add(template)
-    db.session.commit()
-    
-    return jsonify({'success': True, 'template_id': template.id})
-
-
-@app.route('/api/project_template/<int:template_id>/apply', methods=['POST'])
-@login_required
-def apply_project_template(template_id):
-    """Apply a project template to create tasks"""
-    from models import ProjectTemplate, TaskActivityLog
-    import json
-    
-    template = ProjectTemplate.query.get_or_404(template_id)
-    
-    try:
-        task_templates = json.loads(template.template_data)
-        created_tasks = []
-        
-        for task_data in task_templates:
-            task = Task(
-                title=task_data.get('title', ''),
-                description=task_data.get('description', ''),
-                priority=task_data.get('priority', 'medium'),
-                user_id=session['user_id']
-            )
-            db.session.add(task)
-            db.session.flush()  # Get task ID
-            
-            # Log task creation
-            activity = TaskActivityLog(
-                action='task_created_from_template',
-                details=json.dumps({'template': template.name, 'title': task.title}),
-                task_id=task.id,
-                user_id=session['user_id']
-            )
-            db.session.add(activity)
-            created_tasks.append(task.id)
-        
-        db.session.commit()
-        return jsonify({'success': True, 'created_tasks': created_tasks})
-        
-    except json.JSONDecodeError:
-        return jsonify({'success': False, 'error': 'Invalid template data'})
 
 
 @app.route('/admin')
@@ -909,6 +871,16 @@ def handle_message(data):
         print("User not found")
         return
 
+    # --- Mention detection ---
+    def extract_mentions(text):
+        # Matches @username (alphanumeric and underscores)
+        return set(re.findall(r'@([\w\d_]+)', text))
+
+    mentioned_usernames = extract_mentions(content)
+    mentioned_users = []
+    if mentioned_usernames:
+        mentioned_users = User.query.filter(User.username.in_(mentioned_usernames)).all()
+
     # Handle direct messages
     if recipient_id:
         message = ChatMessage(
@@ -926,13 +898,22 @@ def handle_message(data):
             'content': message.content,
             'username': user.username,
             'is_admin': user.is_admin,
+            'status': user.status or 'offline',
             'timestamp': message.timestamp.isoformat(),
+            'profile_pic': user.profile_pic,
             'attachments': []
         }
         
         print(f"Emitting direct message to users {user.id} and {recipient_id}")
         emit('receive_message', message_data, room=f"user_{user.id}")
         emit('receive_message', message_data, room=f"user_{recipient_id}")
+        # Mention notifications for DMs
+        for mentioned in mentioned_users:
+            if mentioned.id != user.id:
+                emit('mention_notification', {
+                    'from': user.username,
+                    'message': content
+                }, room=f"user_{mentioned.id}")
         return
 
     # Handle room messages
@@ -974,12 +955,22 @@ def handle_message(data):
         'content': message.content,
         'username': user.username,
         'is_admin': user.is_admin,
+        'status': user.status or 'offline',
         'timestamp': message.timestamp.isoformat(),
+        'profile_pic': user.profile_pic,
         'attachments': []
     }
     
     print(f"Emitting room message to room {room_name}")
     emit('receive_message', message_data, room=room_name)
+    # Mention notifications for room messages
+    for mentioned in mentioned_users:
+        if mentioned.id != user.id:
+            emit('mention_notification', {
+                'from': user.username,
+                'message': content,
+                'room': room_name
+            }, room=f"user_{mentioned.id}")
 
 
 @socketio.on('start_typing')
@@ -1059,3 +1050,375 @@ def not_found_error(error):
 @app.errorhandler(500)
 def internal_error(error):
     return render_template('500.html'), 500
+
+
+@app.route('/api/users')
+@login_required
+def get_users():
+    users = User.query.with_entities(User.id, User.username, User.status, User.profile_pic).all()
+    return jsonify([
+        {
+            'id': u.id,
+            'username': u.username,
+            'status': u.status or 'offline',
+            'profile_pic': u.profile_pic
+        } for u in users
+    ])
+
+
+@socketio.on('add_reaction')
+def handle_add_reaction(data):
+    print(f"ADD_REACTION: {data}")
+    if 'user_id' not in session:
+        print("No user_id in session")
+        return
+    user_id = session['user_id']
+    message_id = data.get('message_id')
+    emoji = data.get('emoji')
+    ALLOWED_EMOJIS = {'👍', '😂', '😢', '❤️', '🎉'}
+    if not message_id or emoji not in ALLOWED_EMOJIS:
+        print(f"Invalid data: message_id={message_id}, emoji={emoji}")
+        return
+    message = ChatMessage.query.get(message_id)
+    if not message:
+        print(f"Message not found: {message_id}")
+        return
+    # Only allow reactions in rooms the user is in
+    room_id = message.room_id
+    if not room_id:
+        print("Message has no room_id")
+        return
+    # Add or update reaction
+    existing = MessageReaction.query.filter_by(message_id=message_id, user_id=user_id, emoji=emoji).first()
+    if not existing:
+        reaction = MessageReaction(message_id=message_id, user_id=user_id, emoji=emoji)
+        db.session.add(reaction)
+        db.session.commit()
+        print(f"Added reaction: user={user_id}, message={message_id}, emoji={emoji}")
+    else:
+        print(f"Reaction already exists: user={user_id}, message={message_id}, emoji={emoji}")
+    # Broadcast updated reactions
+    broadcast_reactions_update(message_id, room_id)
+
+
+@socketio.on('remove_reaction')
+def handle_remove_reaction(data):
+    print(f"REMOVE_REACTION: {data}")
+    if 'user_id' not in session:
+        print("No user_id in session")
+        return
+    user_id = session['user_id']
+    message_id = data.get('message_id')
+    emoji = data.get('emoji')
+    ALLOWED_EMOJIS = {'👍', '😂', '😢', '❤️', '🎉'}
+    if not message_id or emoji not in ALLOWED_EMOJIS:
+        print(f"Invalid data: message_id={message_id}, emoji={emoji}")
+        return
+    from models import MessageReaction
+    reaction = MessageReaction.query.filter_by(message_id=message_id, user_id=user_id, emoji=emoji).first()
+    if reaction:
+        db.session.delete(reaction)
+        db.session.commit()
+        print(f"Removed reaction: user={user_id}, message={message_id}, emoji={emoji}")
+    else:
+        print(f"Reaction not found: user={user_id}, message={message_id}, emoji={emoji}")
+    # Find the message to get the room
+    message = ChatMessage.query.get(message_id)
+    if message and message.room_id:
+        broadcast_reactions_update(message_id, message.room_id)
+
+
+def broadcast_reactions_update(message_id, room_id):
+    from models import MessageReaction
+    # Get all reactions for this message
+    reactions = MessageReaction.query.filter_by(message_id=message_id).all()
+    # Format: {emoji: [user_id, ...]}
+    reaction_counts = {}
+    for r in reactions:
+        reaction_counts.setdefault(r.emoji, []).append(r.user_id)
+    emit('reactions_update', {
+        'message_id': message_id,
+        'reactions': {emoji: {'count': len(users), 'user_ids': users} for emoji, users in reaction_counts.items()}
+    }, room=f"room_{room_id}")
+
+
+@socketio.on('reply_message')
+def handle_reply_message(data):
+    if 'user_id' not in session:
+        print("No user_id in session")
+        return
+
+    content = data.get('message', '').strip()
+    parent_id = data.get('parent_id')
+    room_id = data.get('room')
+    recipient_id = data.get('recipient_id')
+    
+    print(f"Received reply: content='{content}', parent_id='{parent_id}', room_id='{room_id}', recipient_id='{recipient_id}'")
+    
+    if not content or not parent_id:
+        print("Empty content or missing parent_id")
+        return
+
+    user = User.query.get(session['user_id'])
+    if not user:
+        print("User not found")
+        return
+
+    # Verify parent message exists
+    parent_message = ChatMessage.query.get(parent_id)
+    if not parent_message:
+        print(f"Parent message not found: {parent_id}")
+        return
+
+    # Handle direct message replies
+    if recipient_id:
+        message = ChatMessage(
+            content=content, 
+            user_id=user.id,
+            recipient_id=recipient_id,
+            is_direct_message=True,
+            parent_id=parent_id
+        )
+        db.session.add(message)
+        db.session.commit()
+        
+        # Send to both users
+        message_data = {
+            'id': message.id,
+            'content': message.content,
+            'username': user.username,
+            'is_admin': user.is_admin,
+            'status': user.status or 'offline',
+            'timestamp': message.timestamp.isoformat(),
+            'profile_pic': user.profile_pic,
+            'attachments': [],
+            'parent_id': parent_id,
+            'parent_username': parent_message.author.username,
+            'parent_content': parent_message.content[:50] + ('...' if len(parent_message.content) > 50 else '')
+        }
+        
+        print(f"Emitting direct reply to users {user.id} and {recipient_id}")
+        emit('receive_message', message_data, room=f"user_{user.id}")
+        emit('receive_message', message_data, room=f"user_{recipient_id}")
+        return
+
+    # Handle room message replies
+    if room_id == 'general':
+        general_room = ChatRoom.query.filter_by(name='General Chat').first()
+        if general_room:
+            room_id = general_room.id
+        else:
+            # Create general room if it doesn't exist
+            general_room = ChatRoom(
+                name='General Chat',
+                description='Default chat room for all team members',
+                created_by=user.id
+            )
+            db.session.add(general_room)
+            db.session.commit()
+            room_id = general_room.id
+    
+    # Convert room_id to int if it's a string
+    try:
+        room_id = int(room_id)
+    except (ValueError, TypeError):
+        print(f"Invalid room_id: {room_id}")
+        return
+    
+    message = ChatMessage(
+        content=content, 
+        user_id=user.id,
+        room_id=room_id,
+        is_direct_message=False,
+        parent_id=parent_id
+    )
+    db.session.add(message)
+    db.session.commit()
+
+    # Broadcast reply to room
+    room_name = f"room_{room_id}"
+    message_data = {
+        'id': message.id,
+        'content': message.content,
+        'username': user.username,
+        'is_admin': user.is_admin,
+        'status': user.status or 'offline',
+        'timestamp': message.timestamp.isoformat(),
+        'profile_pic': user.profile_pic,
+        'attachments': [],
+        'parent_id': parent_id,
+        'parent_username': parent_message.author.username,
+        'parent_content': parent_message.content[:50] + ('...' if len(parent_message.content) > 50 else '')
+    }
+    
+    print(f"Emitting room reply to room {room_name}")
+    emit('receive_message', message_data, room=room_name)
+
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    user = User.query.get(session['user_id'])
+    if request.method == 'POST':
+        # Handle password change
+        if 'old_password' in request.form and 'new_password' in request.form and 'confirm_password' in request.form:
+            old_password = request.form['old_password']
+            new_password = request.form['new_password']
+            confirm_password = request.form['confirm_password']
+            if not user.check_password(old_password):
+                flash('Old password is incorrect.', 'danger')
+            elif len(new_password) < 8:
+                flash('New password must be at least 8 characters.', 'danger')
+            elif new_password != confirm_password:
+                flash('New passwords do not match.', 'danger')
+            else:
+                user.set_password(new_password)
+                db.session.commit()
+                flash('Password updated successfully.', 'success')
+        # Handle profile picture upload
+        if 'profile_pic' in request.files:
+            file = request.files['profile_pic']
+            if file and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                ext = filename.rsplit('.', 1)[1].lower()
+                if ext not in ALLOWED_EXTENSIONS:
+                    flash('Invalid file type. Only PNG and JPG allowed.', 'danger')
+                elif file.content_length and file.content_length > MAX_PROFILE_PIC_SIZE:
+                    flash('File too large (max 1MB).', 'danger')
+                else:
+                    # Save as user_<id>.ext
+                    filename = f'user_{user.id}.{ext}'
+                    filepath = os.path.join(PROFILE_PIC_FOLDER, filename)
+                    # Ensure folder exists
+                    os.makedirs(PROFILE_PIC_FOLDER, exist_ok=True)
+                    # Resize/crop to 256x256
+                    img = Image.open(file)
+                    img = img.convert('RGB')
+                    img = crop_center_resize(img, PROFILE_PIC_DIM, PROFILE_PIC_DIM)
+                    img.save(filepath, quality=90)
+                    user.profile_pic = filename
+                    db.session.commit()
+                    flash('Profile picture updated!', 'success')
+            elif file:
+                flash('Invalid file selected.', 'danger')
+    return render_template('profile.html', user=user)
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def crop_center_resize(img, width, height):
+    # Crop to square, then resize
+    min_dim = min(img.size)
+    left = (img.width - min_dim) // 2
+    top = (img.height - min_dim) // 2
+    right = left + min_dim
+    bottom = top + min_dim
+    img = img.crop((left, top, right, bottom))
+    return img.resize((width, height), Image.LANCZOS)
+
+@app.route('/static/profile_pics/<filename>')
+def profile_pic(filename):
+    return send_from_directory(PROFILE_PIC_FOLDER, filename)
+
+@app.route('/api/set_status', methods=['POST'])
+@login_required
+def set_status():
+    status = request.json.get('status')
+    if status not in ['online', 'away', 'dnd', 'offline']:
+        return jsonify({'success': False, 'error': 'Invalid status'}), 400
+    user = User.query.get(session['user_id'])
+    user.status = status
+    db.session.commit()
+    # Broadcast to all users
+    socketio.emit('user_status_update', {
+        'user_id': user.id,
+        'username': user.username,
+        'status': status
+    }, broadcast=True)
+    return jsonify({'success': True, 'status': status})
+
+@socketio.on('set_status')
+def handle_set_status(data):
+    if 'user_id' not in session:
+        return
+    status = data.get('status')
+    if status not in ['online', 'away', 'dnd', 'offline']:
+        return
+    user = User.query.get(session['user_id'])
+    user.status = status
+    db.session.commit()
+    # Broadcast to all users
+    emit('user_status_update', {
+        'user_id': user.id,
+        'username': user.username,
+        'status': status
+    }, broadcast=True)
+
+@app.route('/api/online_users')
+@login_required
+def get_online_users():
+    users = User.query.filter(User.id.in_(online_users)).all()
+    usernames = [u.username for u in users]
+    return jsonify({'usernames': usernames})
+
+@app.route('/api/projects', methods=['GET'])
+@login_required
+def get_projects():
+    projects = Project.query.order_by(Project.created_at.desc()).all()
+    return jsonify([{
+        'id': p.id,
+        'name': p.name,
+        'description': p.description,
+        'created_by': p.created_by,
+        'created_at': p.created_at.isoformat()
+    } for p in projects])
+
+@app.route('/api/projects', methods=['POST'])
+@admin_required
+def create_project():
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    description = data.get('description', '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Project name is required'})
+    project = Project(
+        name=name,
+        description=description,
+        created_by=session['user_id']
+    )
+    db.session.add(project)
+    db.session.commit()
+    return jsonify({'success': True, 'project_id': project.id})
+
+@app.route('/api/projects/<int:project_id>', methods=['PUT'])
+@admin_required
+def edit_project(project_id):
+    data = request.get_json()
+    name = data.get('name', '').strip()
+    description = data.get('description', '').strip()
+    project = Project.query.get_or_404(project_id)
+    if name:
+        project.name = name
+    project.description = description
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/projects/<int:project_id>', methods=['DELETE'])
+@admin_required
+def delete_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    db.session.delete(project)
+    db.session.commit()
+    return jsonify({'success': True})
+
+@app.route('/api/projects/<int:project_id>', methods=['GET'])
+@login_required
+def get_project(project_id):
+    project = Project.query.get_or_404(project_id)
+    return jsonify({
+        'id': project.id,
+        'name': project.name,
+        'description': project.description,
+        'created_by': project.created_by,
+        'created_at': project.created_at.isoformat()
+    })
