@@ -864,3 +864,28 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function clearAllChatData() {
+    if (!confirm('Are you sure you want to clear ALL chat data? This will delete all messages and rooms except General Chat. This action cannot be undone.')) {
+        return;
+    }
+    fetch('/api/clear_all_chat_data', {
+        method: 'DELETE',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': window.csrf_token || ''
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert('All chat data cleared successfully!');
+            window.location.reload();
+        } else {
+            alert('Error: ' + (data.error || 'Failed to clear chat data.'));
+        }
+    })
+    .catch(error => {
+        alert('An error occurred while clearing chat data.');
+    });
+}
